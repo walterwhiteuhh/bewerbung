@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     sql_echo: bool = False
     host: str = "127.0.0.1"
     port: int = 8000
+    fetch_timeout: float = Field(default=10.0, description="Timeout für den Anzeigen-Import (s)")
     auto_migrate: bool = Field(
         default=True, description="Alembic-Migrationen beim Start automatisch ausführen."
     )

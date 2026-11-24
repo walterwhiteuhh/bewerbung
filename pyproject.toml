@@ -11,12 +11,12 @@ dependencies = [
     "alembic>=1.14",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "httpx>=0.28",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
 ]
@@ -55,5 +55,5 @@ addopts = "-q"
 filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["E501", "PLR2004", "PT018"]
+"tests/**" = ["E501", "PLR2004", "PT018", "RUF001"]
 "src/bewerbung/db/migrations/**" = ["E501", "W291", "I001", "F401"]

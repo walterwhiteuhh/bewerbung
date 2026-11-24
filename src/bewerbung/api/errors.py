@@ -13,6 +13,7 @@ from bewerbung.domain.errors import (
     InvalidTransitionError,
     NotFoundError,
 )
+from bewerbung.sources.fetcher import FetchError
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(InvalidTransitionError)
     async def _transition(_: Request, exc: InvalidTransitionError) -> JSONResponse:
         return _error(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
+
+    @app.exception_handler(FetchError)
+    async def _fetch(_: Request, exc: FetchError) -> JSONResponse:
+        logger.info("Import fehlgeschlagen: %s", exc)
+        return _error(status.HTTP_502_BAD_GATEWAY, str(exc))
 
     @app.exception_handler(DomainError)
     async def _domain(_: Request, exc: DomainError) -> JSONResponse:

@@ -19,13 +19,16 @@ from bewerbung.db.migrate import upgrade_to_head
 from bewerbung.db.session import build_engine, build_session_factory
 from bewerbung.logging_config import configure_logging
 from bewerbung.sources import default_registry
+from bewerbung.sources.fetcher import HttpPageFetcher, PageFetcher
 
 logger = logging.getLogger(__name__)
 
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, page_fetcher: PageFetcher | None = None
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
@@ -41,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = build_session_factory(engine)
     app.state.source_registry = default_registry()
+    app.state.page_fetcher = page_fetcher or HttpPageFetcher(timeout=settings.fetch_timeout)
 
     register_error_handlers(app)
     app.include_router(router)

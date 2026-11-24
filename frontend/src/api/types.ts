@@ -103,6 +103,9 @@ export interface PostingInput {
   salary_min?: number | null;
   salary_max?: number | null;
   description?: string | null;
+  salary_currency?: string;
+  posted_at?: string | null;
+  raw_payload?: Record<string, unknown> | null;
   initial_status?: ApplicationStatus;
   priority?: number;
 }
@@ -112,6 +115,23 @@ export interface SourceDetection {
   external_id: string | null;
   url_normalized: string;
   duplicate_of: number | null;
+}
+
+export interface ImportPreview {
+  detection: SourceDetection;
+  method: "json-ld" | "opengraph" | "none";
+  title: string | null;
+  company_name: string | null;
+  location: string | null;
+  remote_type: RemoteType;
+  employment_type: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  description: string | null;
+  posted_at: string | null;
+  raw_payload: Record<string, unknown>;
+  warnings: string[];
 }
 
 export interface CountBucket {

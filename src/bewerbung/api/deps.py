@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from bewerbung.db.session import session_scope
 from bewerbung.sources import SourceRegistry
+from bewerbung.sources.fetcher import PageFetcher
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -21,5 +22,11 @@ def get_registry(request: Request) -> SourceRegistry:
     return registry
 
 
+def get_fetcher(request: Request) -> PageFetcher:
+    fetcher: PageFetcher = request.app.state.page_fetcher
+    return fetcher
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 RegistryDep = Annotated[SourceRegistry, Depends(get_registry)]
+FetcherDep = Annotated[PageFetcher, Depends(get_fetcher)]
