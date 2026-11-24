@@ -9,6 +9,7 @@ import {
   type PostingDetail,
   type PostingInput,
   type RemoteType,
+  type ImportPreview,
   type SourceDetection,
 } from "../api/types";
 import { REMOTE_LABEL, SOURCE_LABEL, STATUS_LABEL } from "../lib/labels";
@@ -40,6 +41,8 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
     priority: 3,
   });
   const [detection, setDetection] = useState<SourceDetection | null>(null);
+  const [imported, setImported] = useState<ImportPreview | null>(null);
+  const [importing, setImporting] = useState(false);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
 
   async function detect(url: string) {
@@ -49,6 +52,33 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
       setDetection(d.duplicate_of === initial?.id ? { ...d, duplicate_of: null } : d);
     } catch {
       setDetection(null);
+    }
+  }
+
+  /** Anzeige laden und nur leere Felder befüllen, damit nichts Getipptes überschrieben wird. */
+  async function loadFromUrl(url: string) {
+    if (!url.trim() || importing) return;
+    setImporting(true);
+    try {
+      const preview = await api.importPreview(url);
+      setImported(preview);
+      setDetection(preview.detection.duplicate_of === initial?.id ? { ...preview.detection, duplicate_of: null } : preview.detection);
+      setF((s) => ({
+        ...s,
+        title: s.title || preview.title || "",
+        company_name: s.company_name || preview.company_name || "",
+        location: s.location || preview.location || "",
+        remote_type: s.remote_type === "unknown" ? preview.remote_type : s.remote_type,
+        employment_type: s.employment_type || preview.employment_type || "",
+        salary_min: s.salary_min || (preview.salary_min?.toString() ?? ""),
+        salary_max: s.salary_max || (preview.salary_max?.toString() ?? ""),
+        description: s.description || preview.description || "",
+      }));
+      if (preview.method !== "none") toast("Daten aus der Anzeige übernommen");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Import fehlgeschlagen", "error");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -68,6 +98,13 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
       salary_min: toInt(f.salary_min),
       salary_max: toInt(f.salary_max),
       description: f.description || null,
+      ...(imported && !editing
+        ? {
+            raw_payload: imported.raw_payload,
+            posted_at: imported.posted_at,
+            ...(imported.salary_currency ? { salary_currency: imported.salary_currency } : {}),
+          }
+        : {}),
       ...(editing ? {} : { initial_status: f.initial_status, priority: f.priority }),
     };
     save.mutate(data, {
@@ -88,21 +125,38 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
     <form className="form" onSubmit={submit}>
       <label className="field field--full">
         <span>Link zur Anzeige</span>
-        <input
-          type="url"
-          inputMode="url"
-          placeholder="https://www.linkedin.com/jobs/view/…"
-          value={f.url}
-          onChange={(e) => set("url", e.target.value)}
-          onBlur={(e) => void detect(e.target.value)}
-          onPaste={(e) => void detect(e.clipboardData.getData("text"))}
-          autoFocus={!editing}
-        />
+        <div className="url-row">
+          <input
+            type="url"
+            inputMode="url"
+            placeholder="https://www.linkedin.com/jobs/view/…"
+            value={f.url}
+            onChange={(e) => set("url", e.target.value)}
+            onBlur={(e) => void detect(e.target.value)}
+            onPaste={(e) => {
+              const pasted = e.clipboardData.getData("text");
+              void detect(pasted);
+              if (!editing && !f.title) void loadFromUrl(pasted);
+            }}
+            autoFocus={!editing}
+          />
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void loadFromUrl(f.url)}
+            disabled={!f.url.trim() || importing}
+          >
+            {importing ? <span className="spinner" aria-label="Lädt" /> : "Daten laden"}
+          </button>
+        </div>
         {detection && (
           <span className="hint">
             Erkannt: <strong>{SOURCE_LABEL[detection.source]}</strong>
             {detection.external_id && <> · Job-ID {detection.external_id}</>}
           </span>
+        )}
+        {imported && imported.method !== "json-ld" && (
+          <span className="hint hint--warn">{imported.warnings.find((w) => !w.includes("bereits")) ?? ""}</span>
         )}
         {detection?.duplicate_of != null && (
           <span className="hint hint--warn">

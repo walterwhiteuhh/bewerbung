@@ -40,6 +40,10 @@ class LinkedInAdapter(SourceAdapter):
             )
         return SourceReference(source=self.source, url_normalized=strip_tracking(parts))
 
+    def fetch_url(self, reference: SourceReference, original_url: str) -> str:
+        # Such-URLs (?currentJobId=) liefern keine Stellendaten, die Detailseite schon.
+        return reference.url_normalized if reference.external_id else original_url
+
 
 class StepstoneAdapter(SourceAdapter):
     """Erkennt ``/stellenangebote--<slug>--<id>-inline.html`` (de/at/ch/...)."""

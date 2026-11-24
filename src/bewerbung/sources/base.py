@@ -1,20 +1,19 @@
 """Schnittstelle für Quellen (LinkedIn, Stepstone, ...).
 
-Iteration 1 nutzt nur ``identify``: aus einer eingefügten URL werden Quelle,
-externe ID und eine normalisierte URL abgeleitet (Dublettenschutz).
-``fetch`` ist der Andockpunkt für spätere Live-Importer (API oder Scraper).
+``identify`` leitet aus einer URL Quelle, externe ID und normalisierte URL ab
+(Dublettenschutz, ohne Netzwerk). ``fetch_url`` bestimmt, welche Seite der
+Import lädt; das Extrahieren übernimmt ``sources.extract`` für alle Quellen gemeinsam.
+Eine Quelle mit offizieller API kann später einen eigenen Importer bekommen.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any
 from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from bewerbung.domain.enums import JobSource, RemoteType
+from bewerbung.domain.enums import JobSource
 
 _TRACKING_PREFIXES = ("utm_", "trk", "ref", "src", "cmp", "gclid", "fbclid", "mc_")
 
@@ -25,23 +24,6 @@ class SourceReference(BaseModel):
     source: JobSource
     external_id: str | None = None
     url_normalized: str
-
-
-class JobPostingDraft(BaseModel):
-    """Vorgeschlagene Stellendaten, wie ein Importer sie liefert (noch nicht gespeichert)."""
-
-    title: str
-    company_name: str | None = None
-    location: str | None = None
-    remote_type: RemoteType = RemoteType.UNKNOWN
-    description: str | None = None
-    posted_at: datetime | None = None
-    reference: SourceReference
-    raw_payload: dict[str, Any] = Field(default_factory=dict)
-
-
-class ImportNotSupportedError(NotImplementedError):
-    pass
 
 
 def parse_url(url: str) -> SplitResult:
@@ -75,6 +57,6 @@ class SourceAdapter(ABC):
     def identify(self, parts: SplitResult) -> SourceReference:
         """Externe ID und normalisierte URL bestimmen, ohne Netzwerkzugriff."""
 
-    async def fetch(self, reference: SourceReference) -> JobPostingDraft:
-        """Stellendaten live laden. Wird in späteren Iterationen je Quelle implementiert."""
-        raise ImportNotSupportedError(f"Import für {self.source} ist noch nicht verfügbar")
+    def fetch_url(self, reference: SourceReference, original_url: str) -> str:
+        """Welche Seite für den Import geladen wird. Adapter können eine stabilere URL wählen."""
+        return original_url

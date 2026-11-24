@@ -50,6 +50,31 @@ class SourceDetection(_Schema):
     )
 
 
+class ImportRequest(_Schema):
+    url: str = Field(min_length=4, max_length=2048)
+
+
+class ImportPreview(_Schema):
+    """Vorschlag aus der geladenen Seite; wird nicht gespeichert, das Formular übernimmt ihn."""
+
+    detection: SourceDetection
+    method: str = Field(description="'json-ld', 'opengraph' oder 'none'")
+    title: str | None
+    company_name: str | None
+    location: str | None
+    remote_type: RemoteType
+    employment_type: str | None
+    salary_min: int | None
+    salary_max: int | None
+    salary_currency: str | None
+    description: str | None
+    posted_at: datetime | None
+    raw_payload: dict[str, Any] = Field(
+        description="Rohdaten plus Metadaten (fetched_at, extractor); beim Anlegen mitsenden"
+    )
+    warnings: list[str] = Field(default_factory=list)
+
+
 # --- Stellenanzeigen ---------------------------------------------------------
 
 

@@ -1,5 +1,6 @@
 import type {
   Application,
+  ImportPreview,
   Note,
   PostingDetail,
   PostingFilter,
@@ -61,6 +62,7 @@ export const api = {
   restorePosting: (id: number) => request<PostingDetail>(`/postings/${id}/restore`, { method: "POST" }),
   detectSource: (url: string) =>
     request<SourceDetection>(`/sources/detect?${new URLSearchParams({ url })}`),
+  importPreview: (url: string) => request<ImportPreview>("/sources/import", json("POST", { url })),
   changeStatus: (appId: number, status: ApplicationStatus, note?: string, occurredAt?: string) =>
     request<Application>(
       `/applications/${appId}/status`,

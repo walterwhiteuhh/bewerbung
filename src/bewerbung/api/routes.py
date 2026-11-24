@@ -6,10 +6,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from bewerbung.api.deps import RegistryDep, SessionDep
+from bewerbung.api.deps import FetcherDep, RegistryDep, SessionDep
 from bewerbung.domain.schemas import (
     ApplicationRead,
     ApplicationUpdate,
+    ImportPreview,
+    ImportRequest,
     NoteCreate,
     NoteRead,
     PostingCreate,
@@ -22,7 +24,7 @@ from bewerbung.domain.schemas import (
     Stats,
     StatusChange,
 )
-from bewerbung.services import applications, postings, stats
+from bewerbung.services import applications, importer, postings, stats
 
 router = APIRouter(prefix="/api")
 
@@ -38,6 +40,14 @@ def detect_source(
 ) -> SourceDetection:
     """Quelle, externe ID und mögliche Dublette zu einer eingefügten URL bestimmen."""
     return postings.detect_source(session, registry, url)
+
+
+@router.post("/sources/import", response_model=ImportPreview, tags=["sources"])
+async def import_preview(
+    session: SessionDep, registry: RegistryDep, fetcher: FetcherDep, data: ImportRequest
+) -> ImportPreview:
+    """Anzeige laden und Felder vorschlagen. Speichert nichts; 502, wenn die Seite nicht lädt."""
+    return await importer.preview_import(session, registry, fetcher, data.url)
 
 
 # --- Stellen -----------------------------------------------------------------
