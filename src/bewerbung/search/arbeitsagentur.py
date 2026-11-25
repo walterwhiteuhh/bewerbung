@@ -81,6 +81,8 @@ def to_draft(item: dict[str, Any]) -> ListingDraft | None:
         title=title,
         company_name=_company(item),
         location=_location(item),
+        # Die Trefferliste kennzeichnet Minijobs, nennt aber sonst keine Arbeitszeit.
+        employment_type="Minijob" if item.get("istGeringfuegigeBeschaeftigung") is True else None,
         posted_at=_parse_date(
             item.get("datumErsteVeroeffentlichung") or item.get("aktuelleVeroeffentlichungsdatum")
         ),

@@ -60,6 +60,8 @@ def test_detect_and_extract() -> None:
     docx = make_docx("Max Muster", "Data Scientist")
     assert detect_type(docx, "cv.docx") is DOCX
     assert extract_text(docx, DOCX).text == "Max Muster\nData Scientist"
+    bom = "\ufeffLebenslauf".encode()
+    assert extract_text(bom, detect_type(bom, "cv.txt")).text == "Lebenslauf"
 
 
 def test_documents_dir_next_to_database(settings: Settings) -> None:
