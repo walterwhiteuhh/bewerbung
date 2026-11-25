@@ -233,6 +233,10 @@ class PostingFilter(_Schema):
     q: OptStr = None
     status: list[ApplicationStatus] = Field(default_factory=list)
     source: list[JobSource] = Field(default_factory=list)
+    remote: list[RemoteType] = Field(default_factory=list)
+    location: OptStr = None
+    min_salary: int | None = Field(default=None, ge=0)
+    follow_up_due: bool = False
     include_archived: bool = False
     sort: SortField = "updated_at"
     order: Literal["asc", "desc"] = "desc"
@@ -253,3 +257,93 @@ class Stats(_Schema):
     response_rate: float | None = Field(
         description="Anteil beworbener Stellen mit Rückmeldung (über 'applied' hinaus)"
     )
+
+
+# --- Live-Suche ----------------------------------------------------------------
+
+
+class ProviderInfo(_Schema):
+    source: JobSource
+    label: str
+    available: bool
+    reason: str | None = None
+
+
+class SearchRequest(_Schema):
+    query: str = Field(min_length=1, max_length=255)
+    location: OptStr = Field(default=None, max_length=255)
+    radius_km: int | None = Field(default=None, ge=0, le=200)
+    remote_only: bool = False
+    sources: list[JobSource] = Field(
+        default_factory=list, description="Leer = alle verfügbaren Provider"
+    )
+    profile_id: int | None = None
+
+
+class ListingRead(_Schema):
+    id: int
+    posting_id: int | None
+    source: JobSource
+    external_id: str | None
+    url: str | None
+    title: str
+    company_name: str | None
+    location: str | None
+    remote_type: RemoteType
+    employment_type: str | None
+    salary_min: int | None
+    salary_max: int | None
+    salary_currency: str | None
+    description: str | None
+    posted_at: datetime | None
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class SearchHitRead(_Schema):
+    rank: int
+    is_new: bool
+    listing: ListingRead
+
+
+class SearchError(_Schema):
+    source: str
+    message: str
+
+
+class SearchRunSummary(_Schema):
+    id: int
+    profile_id: int | None
+    query: str
+    location: str | None
+    radius_km: int | None
+    remote_only: bool
+    sources: list[str]
+    started_at: datetime
+    finished_at: datetime | None
+    total_hits: int
+    new_hits: int
+    errors: list[SearchError]
+
+
+class SearchRunRead(SearchRunSummary):
+    hits: list[SearchHitRead]
+
+
+class SearchProfileCreate(_Schema):
+    name: str = Field(min_length=1, max_length=120)
+    query: str = Field(min_length=1, max_length=255)
+    location: OptStr = Field(default=None, max_length=255)
+    radius_km: int | None = Field(default=None, ge=0, le=200)
+    remote_only: bool = False
+    sources: list[JobSource] = Field(default_factory=list)
+
+
+class SearchProfileRead(SearchProfileCreate):
+    id: int
+    created_at: datetime
+
+
+class SaveListing(_Schema):
+    initial_status: ApplicationStatus = ApplicationStatus.SAVED
+    priority: Priority = 3

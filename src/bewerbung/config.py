@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     fetch_timeout: float = Field(default=10.0, description="Timeout für den Anzeigen-Import (s)")
+    # Live-Suche. Arbeitsagentur nutzt den öffentlichen Schlüssel der Jobsuche-API.
+    arbeitsagentur_api_key: str = "jobboerse-jobsuche"
+    adzuna_app_id: str | None = Field(default=None, description="https://developer.adzuna.com")
+    adzuna_app_key: str | None = None
+    search_timeout: float = 15.0
     auto_migrate: bool = Field(
         default=True, description="Alembic-Migrationen beim Start automatisch ausführen."
     )

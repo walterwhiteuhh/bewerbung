@@ -25,6 +25,7 @@ export const SOURCES = [
   "softgarden",
   "join",
   "workday",
+  "adzuna",
   "manual",
   "other",
 ] as const;
@@ -166,6 +167,85 @@ export interface PostingFilter {
   q: string;
   status: ApplicationStatus[];
   source: JobSource[];
+  remote: RemoteType[];
+  location: string;
+  minSalary: number | null;
+  followUpDue: boolean;
+  includeArchived: boolean;
   sort: SortField;
   order: "asc" | "desc";
+}
+
+// --- Live-Suche -----------------------------------------------------------------
+
+export interface ProviderInfo {
+  source: JobSource;
+  label: string;
+  available: boolean;
+  reason: string | null;
+}
+
+export interface Listing {
+  id: number;
+  posting_id: number | null;
+  source: JobSource;
+  external_id: string | null;
+  url: string | null;
+  title: string;
+  company_name: string | null;
+  location: string | null;
+  remote_type: RemoteType;
+  employment_type: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  description: string | null;
+  posted_at: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface SearchHit {
+  rank: number;
+  is_new: boolean;
+  listing: Listing;
+}
+
+export interface SearchParams {
+  query: string;
+  location: string | null;
+  radius_km: number | null;
+  remote_only: boolean;
+  sources: JobSource[];
+  profile_id?: number | null;
+}
+
+export interface SearchRunSummary {
+  id: number;
+  profile_id: number | null;
+  query: string;
+  location: string | null;
+  radius_km: number | null;
+  remote_only: boolean;
+  sources: string[];
+  started_at: string;
+  finished_at: string | null;
+  total_hits: number;
+  new_hits: number;
+  errors: { source: string; message: string }[];
+}
+
+export interface SearchRun extends SearchRunSummary {
+  hits: SearchHit[];
+}
+
+export interface SearchProfile {
+  id: number;
+  name: string;
+  query: string;
+  location: string | null;
+  radius_km: number | null;
+  remote_only: boolean;
+  sources: JobSource[];
+  created_at: string;
 }

@@ -1,5 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 
+export type View = "list" | "search";
+
+let openedInApp = false; // nur dann darf "Schließen" per history.back() zurückspringen
+
+function useHash(): string {
+  const [hash, setHash] = useState(window.location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return hash;
+}
+
+/** Ansicht aus dem Hash: #/suche = Suche, sonst die eigene Liste. */
+export function useView(): [View, (v: View) => void] {
+  const hash = useHash();
+  const view: View = hash.startsWith("#/suche") ? "search" : "list";
+  const setView = useCallback((v: View) => {
+    window.location.hash = v === "search" ? "/suche" : "/";
+  }, []);
+  return [view, setView];
+}
+
 /** Minimales Routing über den Hash (#/stelle/12). Zurück-Taste schließt so das Detail auf dem Handy. */
 export function useSelectedId(): [number | null, (id: number | null) => void] {
   const parse = () => {
@@ -16,9 +40,15 @@ export function useSelectedId(): [number | null, (id: number | null) => void] {
 
   const select = useCallback((next: number | null) => {
     if (next === null) {
-      if (window.location.hash) history.back();
+      if (openedInApp) {
+        openedInApp = false;
+        history.back();
+      } else {
+        window.location.hash = "/";
+      }
       return;
     }
+    openedInApp = true;
     window.location.hash = `/stelle/${next}`;
   }, []);
 

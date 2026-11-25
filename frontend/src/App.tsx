@@ -3,12 +3,14 @@ import { useState } from "react";
 import { usePostings } from "./api/hooks";
 import { SOURCES, type ApplicationStatus, type JobSource, type PostingDetail as Posting, type PostingFilter, type SortField } from "./api/types";
 import { Dialog } from "./components/Dialog";
+import { EMPTY_EXTRA, FilterPanel, activeFilterCount } from "./components/FilterPanel";
 import { PostingDetail } from "./components/PostingDetail";
 import { PostingForm } from "./components/PostingForm";
 import { PostingList } from "./components/PostingList";
+import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
 import { SOURCE_LABEL } from "./lib/labels";
-import { useDebounced, useMediaQuery, useSelectedId } from "./lib/useHashRoute";
+import { useDebounced, useMediaQuery, useSelectedId, useView } from "./lib/useHashRoute";
 
 const SORTS: { value: `${SortField}:${"asc" | "desc"}`; label: string }[] = [
   { value: "updated_at:desc", label: "Zuletzt bearbeitet" },
@@ -23,6 +25,9 @@ type FormState = { mode: "create" } | { mode: "edit"; posting: Posting } | null;
 export function App() {
   const isWide = useMediaQuery("(min-width: 1024px)");
   const [selectedId, select] = useSelectedId();
+  const [view, setView] = useView();
+  const [extra, setExtra] = useState(EMPTY_EXTRA);
+  const [showFilters, setShowFilters] = useState(false);
   const [form, setForm] = useState<FormState>(null);
 
   const [q, setQ] = useState("");
@@ -31,7 +36,9 @@ export function App() {
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("updated_at:desc");
 
   const [sortField, order] = sort.split(":") as [SortField, "asc" | "desc"];
+  const debouncedExtra = useDebounced(extra, 300);
   const filter: PostingFilter = {
+    ...debouncedExtra,
     q: useDebounced(q),
     status,
     source: source ? [source] : [],
@@ -39,7 +46,7 @@ export function App() {
     order,
   };
   const { data, isLoading, isFetching } = usePostings(filter);
-  const filtered = Boolean(filter.q || status.length || source);
+  const filtered = Boolean(filter.q || status.length || source || activeFilterCount(extra));
 
   const toggleStatus = (s: ApplicationStatus | null) =>
     setStatus((cur) => (s === null ? [] : cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
@@ -50,6 +57,31 @@ export function App() {
   };
 
   const detailOpen = selectedId !== null;
+  const tabs = (
+    <nav className="tabs" aria-label="Ansicht">
+      <button type="button" className={view === "list" ? "is-active" : ""} aria-current={view === "list"} onClick={() => setView("list")}>
+        Meine Stellen
+      </button>
+      <button type="button" className={view === "search" ? "is-active" : ""} aria-current={view === "search"} onClick={() => setView("search")}>
+        Suche in Portalen
+      </button>
+    </nav>
+  );
+
+  if (view === "search") {
+    return (
+      <div className="app">
+        <header className="topbar topbar--search">
+          <div className="brand">
+            <span className="brand__mark" aria-hidden />
+            <h1>Bewerbungen</h1>
+          </div>
+          {tabs}
+        </header>
+        <SearchView onOpenPosting={select} />
+      </div>
+    );
+  }
 
   return (
     <div className={`app ${detailOpen ? "has-detail" : ""}`}>
@@ -58,6 +90,7 @@ export function App() {
           <span className="brand__mark" aria-hidden />
           <h1>Bewerbungen</h1>
         </div>
+        {tabs}
         <label className="search">
           <span className="sr-only">Suchen</span>
           <svg viewBox="0 0 24 24" aria-hidden>
@@ -91,11 +124,20 @@ export function App() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              className={`btn btn--small ${showFilters || activeFilterCount(extra) ? "is-active" : ""}`}
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((x) => !x)}
+            >
+              Filter{activeFilterCount(extra) ? ` (${activeFilterCount(extra)})` : ""}
+            </button>
             <span className="muted filters__count">
               {data ? `${data.total} ${data.total === 1 ? "Stelle" : "Stellen"}` : ""}
               {isFetching && !isLoading ? " …" : ""}
             </span>
           </div>
+          {showFilters && <FilterPanel value={extra} onChange={setExtra} />}
           <PostingList
             items={data?.items ?? []}
             selectedId={selectedId}

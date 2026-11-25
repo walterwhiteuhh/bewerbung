@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 from sqlalchemy import ColumnElement, Select, SQLColumnExpression, and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from bewerbung.db.models import Application, ApplicationStatusEvent, Company, JobPosting
+from bewerbung.db.models import Application, ApplicationStatusEvent, Company, JobPosting, Listing
 from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus, JobSource
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
@@ -49,7 +49,13 @@ def detect_source(session: Session, registry: SourceRegistry, url: str) -> Sourc
     )
 
 
-def create_posting(session: Session, registry: SourceRegistry, data: PostingCreate) -> JobPosting:
+def create_posting(
+    session: Session,
+    registry: SourceRegistry,
+    data: PostingCreate,
+    *,
+    with_listing: bool = True,
+) -> JobPosting:
     ref: SourceReference | None = registry.identify(data.url) if data.url else None
     source = data.source or (ref.source if ref else JobSource.MANUAL)
     external_id = data.external_id or (ref.external_id if ref else None)
@@ -87,6 +93,29 @@ def create_posting(session: Session, registry: SourceRegistry, data: PostingCrea
     application.events.append(
         ApplicationStatusEvent(from_status=None, to_status=data.initial_status, occurred_at=now)
     )
+    if with_listing and source is not JobSource.MANUAL:
+        # Portal-Bezug auch als Listing festhalten, damit spätere Suchläufe die Stelle erkennen.
+        posting.listings.append(
+            Listing(
+                source=source,
+                external_id=external_id,
+                url=data.url,
+                url_normalized=url_normalized,
+                title=data.title,
+                company_name=data.company_name,
+                location=data.location,
+                remote_type=data.remote_type,
+                employment_type=data.employment_type,
+                salary_min=data.salary_min,
+                salary_max=data.salary_max,
+                salary_currency=data.salary_currency.upper(),
+                description=data.description,
+                posted_at=data.posted_at,
+                first_seen_at=now,
+                last_seen_at=now,
+                raw_payload=data.raw_payload,
+            )
+        )
     session.add(posting)
     session.flush()
     logger.info("Stelle %s angelegt (Quelle %s)", posting.id, source)
@@ -172,6 +201,15 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
         where.append(Application.current_status.in_(flt.status))
     if flt.source:
         where.append(JobPosting.source.in_(flt.source))
+    if flt.remote:
+        where.append(JobPosting.remote_type.in_(flt.remote))
+    if flt.location:
+        where.append(func.lower(JobPosting.location).like(f"%{flt.location.lower()}%"))
+    if flt.min_salary is not None:
+        # Spanne überschneidet sich mit dem Wunsch: Maximum (oder Minimum) >= Wunschgehalt
+        where.append(func.coalesce(JobPosting.salary_max, JobPosting.salary_min) >= flt.min_salary)
+    if flt.follow_up_due:
+        where.append(Application.follow_up_at <= utcnow())
     if flt.q:
         pattern = f"%{flt.q.lower()}%"
         where.append(

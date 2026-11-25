@@ -9,6 +9,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from bewerbung.db.session import session_scope
+from bewerbung.search.base import SearchProvider
 from bewerbung.sources import SourceRegistry
 from bewerbung.sources.fetcher import PageFetcher
 
@@ -27,6 +28,12 @@ def get_fetcher(request: Request) -> PageFetcher:
     return fetcher
 
 
+def get_providers(request: Request) -> list[SearchProvider]:
+    providers: list[SearchProvider] = request.app.state.search_providers
+    return providers
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 RegistryDep = Annotated[SourceRegistry, Depends(get_registry)]
 FetcherDep = Annotated[PageFetcher, Depends(get_fetcher)]
+ProvidersDep = Annotated[list[SearchProvider], Depends(get_providers)]

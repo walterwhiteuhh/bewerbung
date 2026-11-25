@@ -124,6 +124,7 @@ class JobPosting(TimestampMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
 
     company: Mapped[Company | None] = relationship(back_populates="postings", lazy="joined")
+    listings: Mapped[list[Listing]] = relationship(back_populates="posting")
     applications: Mapped[list[Application]] = relationship(
         back_populates="posting", order_by="Application.id"
     )
@@ -201,3 +202,125 @@ class Note(TimestampMixin, Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
 
     application: Mapped[Application] = relationship(back_populates="notes")
+
+
+class Listing(TimestampMixin, Base):
+    """Eine Anzeige so, wie ein Portal sie zeigt (Rohsicht pro Quelle).
+
+    * ``posting_id IS NULL``: Suchtreffer, noch nicht gemerkt.
+    * Mehrere Listings können auf dieselbe Stelle zeigen (gleiche Stelle auf XING und Stepstone).
+    * ``first_seen_at``/``last_seen_at`` stammen aus Suchläufen und ergeben die Laufzeit einer
+      Anzeige; ``content_hash`` erkennt inhaltliche Änderungen zwischen zwei Läufen.
+    """
+
+    __tablename__ = "listings"
+    __table_args__ = (
+        Index(
+            "uq_listings_source_external_id",
+            "source",
+            "external_id",
+            unique=True,
+            sqlite_where=text("external_id IS NOT NULL"),
+            postgresql_where=text("external_id IS NOT NULL"),
+        ),
+        Index("ix_listings_url_normalized", "url_normalized"),
+        Index("ix_listings_source_last_seen", "source", "last_seen_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    posting_id: Mapped[int | None] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="SET NULL"), index=True
+    )
+    source: Mapped[JobSource] = mapped_column(_enum(JobSource, "job_source"), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(128))
+    url: Mapped[str | None] = mapped_column(String(2048))
+    url_normalized: Mapped[str | None] = mapped_column(String(2048))
+
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(255))
+    location: Mapped[str | None] = mapped_column(String(255))
+    remote_type: Mapped[RemoteType] = mapped_column(
+        _enum(RemoteType, "remote_type"), default=RemoteType.UNKNOWN, nullable=False
+    )
+    employment_type: Mapped[str | None] = mapped_column(String(64))
+    salary_min: Mapped[int | None] = mapped_column(Integer)
+    salary_max: Mapped[int | None] = mapped_column(Integer)
+    salary_currency: Mapped[str | None] = mapped_column(String(3))
+    description: Mapped[str | None] = mapped_column(Text)
+    posted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    expired_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    posting: Mapped[JobPosting | None] = relationship(back_populates="listings")
+
+
+class SearchProfile(TimestampMixin, Base):
+    """Gespeicherte Suche, die man erneut ausführen kann."""
+
+    __tablename__ = "search_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    query: Mapped[str] = mapped_column(String(255), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(255))
+    radius_km: Mapped[int | None] = mapped_column(Integer)
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    runs: Mapped[list[SearchRun]] = relationship(back_populates="profile")
+
+
+class SearchRun(Base):
+    """Ein Suchlauf (append-only). Parameter werden als Snapshot gespeichert,
+    damit spätere Änderungen am Profil die Historie nicht verfälschen."""
+
+    __tablename__ = "search_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("search_profiles.id", ondelete="SET NULL"), index=True
+    )
+    query: Mapped[str] = mapped_column(String(255), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(255))
+    radius_km: Mapped[int | None] = mapped_column(Integer)
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=utcnow, nullable=False, index=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    total_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    errors: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)
+
+    profile: Mapped[SearchProfile | None] = relationship(back_populates="runs")
+    hits: Mapped[list[SearchHit]] = relationship(back_populates="run", order_by="SearchHit.rank")
+
+
+class SearchHit(Base):
+    """Treffer eines Laufs mit Rang. Zusammen mit ``listings.posting_id`` entsteht daraus
+    später ein Trainingsdatensatz (gezeigt -> gemerkt) für ein Relevanz-Ranking."""
+
+    __tablename__ = "search_hits"
+    __table_args__ = (
+        Index("uq_search_hits_run_listing", "run_id", "listing_id", unique=True),
+        Index("ix_search_hits_listing", "listing_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("search_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    listing_id: Mapped[int] = mapped_column(
+        ForeignKey("listings.id", ondelete="CASCADE"), nullable=False
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_new: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    run: Mapped[SearchRun] = relationship(back_populates="hits")
+    listing: Mapped[Listing] = relationship(lazy="joined")
