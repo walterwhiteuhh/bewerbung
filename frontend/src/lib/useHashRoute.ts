@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type View = "list" | "search";
+export type View = "home" | "list" | "search";
 
 let openedInApp = false; // nur dann darf "Schließen" per history.back() zurückspringen
 
@@ -14,10 +14,14 @@ function useHash(): string {
   return hash;
 }
 
-/** Ansicht aus dem Hash: #/suche = Suche, sonst die eigene Liste. */
+/** Ansicht aus dem Hash: leer oder #/start = Startseite, #/suche = Suche, sonst die eigene Liste. */
 export function useView(): [View, (v: View) => void] {
   const hash = useHash();
-  const view: View = hash.startsWith("#/suche") ? "search" : "list";
+  const view: View = hash.startsWith("#/suche")
+    ? "search"
+    : hash === "" || hash === "#" || hash.startsWith("#/start")
+      ? "home"
+      : "list";
   const setView = useCallback((v: View) => {
     window.location.hash = v === "search" ? "/suche" : "/";
   }, []);

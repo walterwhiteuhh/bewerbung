@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { usePostings, useStats } from "./api/hooks";
 import { SOURCES, type ApplicationStatus, type JobSource, type PostingDetail as Posting, type PostingFilter, type SortField } from "./api/types";
+import { Landing } from "./components/Landing";
 import { Dialog } from "./components/Dialog";
 import { ShipScene } from "./components/ShipScene";
 import { voyageFrom } from "./lib/voyage";
@@ -29,7 +30,13 @@ const SORTS: { value: `${SortField}:${"asc" | "desc"}`; label: string }[] = [
 type ProfileTab = "angaben" | "unterlagen";
 type FormState = { mode: "create" } | { mode: "edit"; posting: Posting } | null;
 
+/** Startseite ohne Datenabfragen; die App-Ansichten laden erst, wenn sie gebraucht werden. */
 export function App() {
+  const [view] = useView();
+  return view === "home" ? <Landing /> : <Workspace />;
+}
+
+function Workspace() {
   const isWide = useMediaQuery("(min-width: 1024px)");
   const [selectedId, select] = useSelectedId();
   const [view, setView] = useView();
@@ -243,7 +250,7 @@ export function App() {
 
 function Brand() {
   return (
-    <div className="brand">
+    <a className="brand" href="#/start" aria-label="Anheuern, zur Startseite">
       <svg className="brand__mark" viewBox="0 0 32 32" aria-hidden>
         <rect width="32" height="32" rx="9" />
         <g fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
@@ -257,6 +264,6 @@ function Brand() {
         </h1>
         <span className="brand__tag">Kurs auf den nächsten Job</span>
       </div>
-    </div>
+    </a>
   );
 }
