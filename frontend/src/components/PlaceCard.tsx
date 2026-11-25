@@ -11,10 +11,9 @@ import { RatingBadge } from "./EmployerRating";
 // --- Minikarte aus OpenStreetMap-Kacheln (ohne Kartenbibliothek) -------------------
 
 const TILE = 256;
-const MAP_W = 300;
-const MAP_H = 150;
+const PAD = 28; // Abstand der Markierungen zum Kartenrand
 
-interface MapPoint {
+export interface MapPoint {
   lat: number;
   lon: number;
   kind: "job" | "home";
@@ -22,39 +21,64 @@ interface MapPoint {
 }
 
 /** Web-Mercator: Grad -> Weltpixel bei Zoomstufe z. */
-function project(lat: number, lon: number, z: number): [number, number] {
+export function project(lat: number, lon: number, z: number): [number, number] {
   const scale = TILE * 2 ** z;
   const rad = (Math.max(Math.min(lat, 85), -85) * Math.PI) / 180;
   return [((lon + 180) / 360) * scale, ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * scale];
 }
 
-function fitZoom(points: MapPoint[], estimated: boolean): number {
+/** Größte Zoomstufe, bei der alle Punkte mit Rand in den Ausschnitt passen. */
+export function fitZoom(points: MapPoint[], estimated: boolean, width: number, height: number): number {
   if (points.length < 2) return estimated ? 11 : 13;
   for (let z = 13; z > 3; z--) {
     const px = points.map((p) => project(p.lat, p.lon, z));
     const w = Math.max(...px.map((p) => p[0])) - Math.min(...px.map((p) => p[0]));
     const h = Math.max(...px.map((p) => p[1])) - Math.min(...px.map((p) => p[1]));
-    if (w <= MAP_W - 56 && h <= MAP_H - 56) return z;
+    if (w <= width - 2 * PAD && h <= height - 2 * PAD) return z;
   }
   return 3;
 }
 
-export function MiniMap({ points, estimated = false }: { points: MapPoint[]; estimated?: boolean }) {
-  const z = fitZoom(points, estimated);
+/** Zoom, benötigte Kacheln und Pixelpositionen der Punkte für einen Ausschnitt width × height. */
+export function mapLayout(points: MapPoint[], estimated: boolean, width: number, height: number) {
+  const z = fitZoom(points, estimated, width, height);
   const px = points.map((p) => project(p.lat, p.lon, z));
   const cx = (Math.min(...px.map((p) => p[0])) + Math.max(...px.map((p) => p[0]))) / 2;
   const cy = (Math.min(...px.map((p) => p[1])) + Math.max(...px.map((p) => p[1]))) / 2;
-  const x0 = cx - MAP_W / 2;
-  const y0 = cy - MAP_H / 2;
+  const x0 = cx - width / 2;
+  const y0 = cy - height / 2;
   const n = 2 ** z;
   const tiles: { x: number; y: number; left: number; top: number }[] = [];
-  for (let tx = Math.floor(x0 / TILE); tx <= Math.floor((x0 + MAP_W) / TILE); tx++) {
-    for (let ty = Math.floor(y0 / TILE); ty <= Math.floor((y0 + MAP_H) / TILE); ty++) {
+  for (let tx = Math.floor(x0 / TILE); tx <= Math.floor((x0 + width) / TILE); tx++) {
+    for (let ty = Math.floor(y0 / TILE); ty <= Math.floor((y0 + height) / TILE); ty++) {
       if (ty < 0 || ty >= n) continue;
       tiles.push({ x: ((tx % n) + n) % n, y: ty, left: tx * TILE - x0, top: ty * TILE - y0 });
     }
   }
   const local = px.map(([x, y]) => [x - x0, y - y0] as const);
+  return { z, tiles, local };
+}
+
+/** Tatsächliche Größe der Karte messen, damit Kacheln und Markierungen exakt übereinanderliegen. */
+function useSize(ref: React.RefObject<HTMLElement>, fallback: [number, number]): [number, number] {
+  const [size, setSize] = useState(fallback);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => el.offsetWidth && setSize([el.offsetWidth, el.offsetHeight]);
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return size;
+}
+
+export function MiniMap({ points, estimated = false }: { points: MapPoint[]; estimated?: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [width, height] = useSize(box, [300, 150]);
+  const { z, tiles, local } = mapLayout(points, estimated, width, height);
   const at = (kind: MapPoint["kind"]) => {
     const i = points.findIndex((p) => p.kind === kind);
     return i >= 0 ? local[i] : undefined;
@@ -63,7 +87,7 @@ export function MiniMap({ points, estimated = false }: { points: MapPoint[]; est
   const home = at("home");
 
   return (
-    <div className="minimap" role="img" aria-label={points.map((p) => p.label).join(", ")}>
+    <div ref={box} className="minimap" role="img" aria-label={points.map((p) => p.label).join(", ")}>
       {tiles.map((t) => (
         <img
           key={`${t.x}-${t.y}-${t.left}`}
@@ -76,7 +100,7 @@ export function MiniMap({ points, estimated = false }: { points: MapPoint[]; est
           onError={(e) => (e.currentTarget.style.visibility = "hidden")}
         />
       ))}
-      <svg className="minimap__overlay" viewBox={`0 0 ${MAP_W} ${MAP_H}`} aria-hidden>
+      <svg className="minimap__overlay" viewBox={`0 0 ${width} ${height}`} aria-hidden>
         {job && home && <line x1={home[0]} y1={home[1]} x2={job[0]} y2={job[1]} className="minimap__route" />}
         {job && estimated && <circle cx={job[0]} cy={job[1]} r={22} className="minimap__area" />}
         {points.map((p, i) => {
@@ -195,6 +219,35 @@ function PlaceCardBody({ info }: { info: PlaceInfo }) {
   );
 }
 
+/** Unter dieser Breite erscheint die Karte als Bottom-Sheet statt als Popover. */
+export const SHEET_BELOW = 640;
+
+/**
+ * Position der Info-Karte: unter dem Auslöser, sonst darüber; passt beides nicht oder ist
+ * der Bildschirm schmal, wird sie als Bottom-Sheet am unteren Rand gezeigt.
+ */
+export function placeCard(
+  r: Pick<DOMRect, "left" | "top" | "bottom">,
+  cardHeight: number,
+  vw: number,
+  vh: number,
+  cardW = CARD_W,
+): { left: number; top: number; above: boolean; sheet: boolean } {
+  const width = Math.min(cardW, vw - 24);
+  const left = Math.min(Math.max(12, r.left), vw - width - 12);
+  const fitsBelow = r.bottom + cardHeight + 12 <= vh;
+  const fitsAbove = r.top - cardHeight - 12 >= 0;
+  if (vw < SHEET_BELOW || (!fitsBelow && !fitsAbove)) return { left: 0, top: 0, above: false, sheet: true };
+  const above = !fitsBelow && fitsAbove;
+  return { left, top: above ? r.top - cardHeight - 8 : r.bottom + 8, above, sheet: false };
+}
+
+/** Kartenbreite wächst mit der Grundschrift (große Bildschirme). */
+function cardWidth(): number {
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return Math.round((CARD_W * root) / 16);
+}
+
 const OPEN_DELAY = 220;
 const CLOSE_DELAY = 160;
 const CARD_W = 316;
@@ -215,7 +268,7 @@ export function PlaceHover({
   interactive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; above: boolean; sheet: boolean } | null>(null);
   const trigger = useRef<HTMLSpanElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const timer = useRef<number>();
@@ -235,12 +288,7 @@ export function PlaceHover({
 
   useLayoutEffect(() => {
     if (!open || !trigger.current) return;
-    const r = trigger.current.getBoundingClientRect();
-    const h = card.current?.offsetHeight ?? 320;
-    const width = Math.min(CARD_W, window.innerWidth - 24);
-    const left = Math.min(Math.max(12, r.left), window.innerWidth - width - 12);
-    const above = r.bottom + h + 12 > window.innerHeight && r.top - h - 12 > 0;
-    setPos({ left, top: above ? r.top - h - 8 : r.bottom + 8, above });
+    setPos(placeCard(trigger.current.getBoundingClientRect(), card.current?.offsetHeight ?? 320, window.innerWidth, window.innerHeight, cardWidth()));
   }, [open, info.features, info.loading]);
 
   useEffect(() => {
@@ -295,14 +343,17 @@ export function PlaceHover({
         createPortal(
           <div
             ref={card}
-            className={`placecard ${pos?.above ? "is-above" : ""}`}
-            style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: Math.min(CARD_W, window.innerWidth - 24) }}
+            className={`placecard ${pos?.above ? "is-above" : ""} ${pos?.sheet ? "is-sheet" : ""}`}
+            style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: Math.min(cardWidth(), window.innerWidth - 24) }}
             role="dialog"
             aria-label="Ort und Firma"
             onPointerEnter={(e) => e.pointerType === "mouse" && window.clearTimeout(timer.current)}
             onPointerLeave={(e) => e.pointerType === "mouse" && schedule(false)}
             onClick={(e) => e.stopPropagation()}
           >
+            <button type="button" className="placecard__close" onClick={() => change(false)} aria-label="Schließen">
+              ×
+            </button>
             <PlaceCardBody info={info} />
           </div>,
           document.body,

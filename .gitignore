@@ -28,3 +28,7 @@ Thumbs.db
 .shopify
 node_modules
 *.zip
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/

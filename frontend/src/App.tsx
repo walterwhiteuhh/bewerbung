@@ -3,6 +3,7 @@ import { useState } from "react";
 import { usePostings } from "./api/hooks";
 import { SOURCES, type ApplicationStatus, type JobSource, type PostingDetail as Posting, type PostingFilter, type SortField } from "./api/types";
 import { Dialog } from "./components/Dialog";
+import { ShipScene } from "./components/ShipScene";
 import { EMPTY_EXTRA, FilterPanel, activeFilterCount } from "./components/FilterPanel";
 import { PostingDetail } from "./components/PostingDetail";
 import { PostingForm } from "./components/PostingForm";
@@ -207,6 +208,7 @@ export function App() {
             />
           ) : (
             <div className="empty empty--detail">
+              <ShipScene />
               <p className="empty__title">Noch nichts an Deck</p>
               <p>Wähle links eine Stelle, um Status, Notizen und Verlauf zu sehen.</p>
             </div>
