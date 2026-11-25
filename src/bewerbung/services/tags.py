@@ -37,7 +37,7 @@ def active_links(session: Session, entity_type: str, entity_id: int) -> dict[int
             select(TagLink).where(
                 TagLink.entity_type == entity_type,
                 TagLink.entity_id == entity_id,
-                TagLink.removed_at.is_(None),
+                TagLink.ended_at.is_(None),
             )
         )
     }
@@ -55,7 +55,7 @@ def link_tags(
     """Ordnet Hashtags einem Objekt zu.
 
     ``replace=False`` ergänzt (bereits gesetzte bleiben unverändert); ``replace=True`` setzt
-    genau diese Menge, nicht mehr gewünschte Zuordnungen werden mit ``removed_at`` beendet
+    genau diese Menge, nicht mehr gewünschte Zuordnungen werden mit ``ended_at`` beendet
     statt gelöscht (Historie).
     """
     tags = get_or_create_tags(session, names)
@@ -65,7 +65,7 @@ def link_tags(
         now = utcnow()
         for tag_id, link in active.items():
             if tag_id not in wanted:
-                link.removed_at = now
+                link.ended_at = now
     for tag in tags:
         if tag.id not in active:
             session.add(
@@ -79,7 +79,7 @@ def drop_entity_tags(session: Session, entity_type: str, entity_id: int) -> None
     """Beim endgültigen Löschen eines Objekts die Zuordnungen beenden."""
     now = utcnow()
     for link in active_links(session, entity_type, entity_id).values():
-        link.removed_at = now
+        link.ended_at = now
 
 
 # --- Stellen (dünne Hüllen, damit Aufrufer ``posting.tags`` direkt wieder lesen) ------------
@@ -94,6 +94,6 @@ def add_tags(
 
 
 def set_tags(session: Session, posting: JobPosting, names: list[str]) -> None:
-    """Setzt genau diese Hashtags. Entfernte werden mit ``removed_at`` beendet, nicht gelöscht."""
+    """Setzt genau diese Hashtags. Entfernte werden mit ``ended_at`` beendet, nicht gelöscht."""
     link_tags(session, TagEntity.POSTING, posting.id, names, replace=True)
     session.expire(posting, ["tag_links"])

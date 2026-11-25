@@ -167,7 +167,7 @@ def test_tag_assignments_view_unifies_both_tables(
     client.put(f"/api/tag-links/company/{cid}", json={"tags": ["Python", "Remote"]})
     rows = _rows(
         settings,
-        "SELECT entity_type, tag_key FROM v_tag_assignments WHERE removed_at IS NULL "
+        "SELECT entity_type, tag_key FROM v_tag_assignments WHERE ended_at IS NULL "
         "ORDER BY entity_type, tag_key",
     )
     assert rows == [("company", "python"), ("company", "remote"), ("posting", "python")]
@@ -182,7 +182,7 @@ def test_hard_delete_ends_tag_links_and_no_orphans(
     with closing(_db(settings)) as con, con:
         con.execute("DELETE FROM companies WHERE id = ?", (cid,))
     assert _rows(settings, "SELECT * FROM v_orphan_tag_links") == []
-    assert _rows(settings, "SELECT removed_at IS NOT NULL FROM tag_links") == [(1,)]
+    assert _rows(settings, "SELECT ended_at IS NOT NULL FROM tag_links") == [(1,)]
 
 
 def test_tag_link_entity_type_is_constrained(client: TestClient, settings: Settings) -> None:
@@ -190,7 +190,7 @@ def test_tag_link_entity_type_is_constrained(client: TestClient, settings: Setti
         con.execute("INSERT INTO tags (name, key, created_at, updated_at) VALUES ('x','x',0,0)")
         with pytest.raises(sqlite3.IntegrityError):
             con.execute(
-                "INSERT INTO tag_links (entity_type, entity_id, tag_id, origin, added_at) "
+                "INSERT INTO tag_links (entity_type, entity_id, tag_id, origin, started_at) "
                 "VALUES ('quatsch', 1, 1, 'manual', 0)"
             )
 
@@ -270,7 +270,7 @@ def test_posting_tags_are_moved_into_tag_links_and_back(tmp_path: Path) -> None:
     with engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT entity_type, entity_id, origin, removed_at IS NULL FROM tag_links ORDER BY id"
+                "SELECT entity_type, entity_id, origin, ended_at IS NULL FROM tag_links ORDER BY id"
             )
         ).all()
         assert [tuple(r) for r in rows] == [("posting", 1, "manual", 0), ("posting", 1, "note", 1)]
@@ -279,5 +279,28 @@ def test_posting_tags_are_moved_into_tag_links_and_back(tmp_path: Path) -> None:
     with engine.connect() as conn:
         assert conn.execute(text("SELECT COUNT(*) FROM posting_tags")).scalar() == 2
         assert conn.execute(text("SELECT COUNT(*) FROM tag_links")).scalar() == 0
+    command.upgrade(cfg, "head")
+    engine.dispose()
+
+
+def test_period_columns_are_unified_and_roundtrip(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'p.db').as_posix()}"
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "head")
+    engine = create_engine(url)
+    with engine.connect() as conn:
+        for table in (
+            "tag_links",
+            "tag_relations",
+            "posting_documents",
+            "document_primary_periods",
+        ):
+            cols = {r[1] for r in conn.execute(text(f"PRAGMA table_info({table})"))}
+            assert {"started_at", "ended_at"} <= cols, table
+            assert not cols & {"added_at", "removed_at", "attached_at", "detached_at"}, table
+    command.downgrade(cfg, "0015")
+    with engine.connect() as conn:
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(tag_links)"))}
+        assert {"added_at", "removed_at"} <= cols
     command.upgrade(cfg, "head")
     engine.dispose()

@@ -242,8 +242,8 @@ def posting_documents(session: Session, posting_id: int) -> list[Document]:
     stmt = (
         select(Document)
         .join(PostingDocument, PostingDocument.document_id == Document.id)
-        .where(PostingDocument.posting_id == posting_id, PostingDocument.detached_at.is_(None))
-        .order_by(PostingDocument.attached_at)
+        .where(PostingDocument.posting_id == posting_id, PostingDocument.ended_at.is_(None))
+        .order_by(PostingDocument.started_at)
     )
     return list(session.scalars(stmt))
 
@@ -261,17 +261,17 @@ def set_posting_documents(
         link.document_id: link
         for link in session.scalars(
             select(PostingDocument).where(
-                PostingDocument.posting_id == posting_id, PostingDocument.detached_at.is_(None)
+                PostingDocument.posting_id == posting_id, PostingDocument.ended_at.is_(None)
             )
         )
     }
     now = utcnow()
     for doc_id, link in active.items():
         if doc_id not in wanted:
-            link.detached_at = now
+            link.ended_at = now
     for doc_id in wanted:
         if doc_id not in active:
-            session.add(PostingDocument(posting_id=posting_id, document_id=doc_id, attached_at=now))
+            session.add(PostingDocument(posting_id=posting_id, document_id=doc_id, started_at=now))
     session.flush()
     return posting_documents(session, posting_id)
 

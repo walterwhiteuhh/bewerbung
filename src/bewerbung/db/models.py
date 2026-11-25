@@ -8,10 +8,13 @@ Designprinzipien:
 * Events sind bitemporal: ``occurred_at`` (wann es fachlich passiert ist, darf
   rückdatiert werden) und ``recorded_at`` (wann es erfasst wurde). So lassen sich
   später Trainingsdaten "as of" einem Stichtag ohne Data Leakage rekonstruieren.
+* Zuordnungen mit Gültigkeit (Hashtags, Unterlagen, Haupt-Lebenslauf, Tag-Verknüpfungen)
+  heißen einheitlich ``started_at`` .. ``ended_at`` (offen = ``ended_at IS NULL``);
+  ``archived_at`` bleibt dem Soft-Delete eines Objekts vorbehalten.
 * Löschen ist ein Soft-Delete (``archived_at``), Rohdaten der Quelle bleiben in
   ``raw_payload`` erhalten.
 * Hashtags hängen über ``tag_links`` an Stellen, Firmen, Unterlagen und Suchen (ein
-  Mechanismus für alle Objekttypen). Entfernen setzt ``removed_at`` statt zu löschen,
+  Mechanismus für alle Objekttypen). Entfernen setzt ``ended_at`` statt zu löschen,
   sodass sich nachvollziehen lässt, wann ein Objekt wie eingeordnet war (Labels für
   spätere Modelle).
 """
@@ -238,7 +241,7 @@ class JobPosting(TimestampMixin, PlaceMixin, Base):
     def tags(self) -> list[str]:
         """Aktuell gesetzte Hashtags (ohne entfernte), alphabetisch."""
         return sorted(
-            (link.tag.name for link in self.tag_links if link.removed_at is None),
+            (link.tag.name for link in self.tag_links if link.ended_at is None),
             key=str.casefold,
         )
 
@@ -259,7 +262,7 @@ class TagLink(Base):
     Derselbe Hashtag gilt übergreifend für alle Objekte. Ohne Fremdschlüssel auf das Objekt
     (die ID zeigt auf mehrere Tabellen): ein CHECK begrenzt ``entity_type``, DB-Trigger
     (SQLite) und Service beenden die Zuordnung beim Löschen. Mit Zeitraum
-    (added_at .. removed_at), damit die Historie erhalten bleibt. ``origin``: "manual"
+    (started_at .. ended_at), damit die Historie erhalten bleibt. ``origin``: "manual"
     (Formular/Detail), "note" (#tag in Notiz), "auto" (aus der Beschreibung).
     """
 
@@ -271,10 +274,10 @@ class TagLink(Base):
             "entity_id",
             "tag_id",
             unique=True,
-            sqlite_where=text("removed_at IS NULL"),
-            postgresql_where=text("removed_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
-        Index("ix_tag_links_tag_removed", "tag_id", "removed_at"),
+        Index("ix_tag_links_tag_ended", "tag_id", "ended_at"),
         Index("ix_tag_links_entity", "entity_type", "entity_id"),
         CheckConstraint(
             "entity_type IN (" + ", ".join(f"'{e.value}'" for e in TagEntity) + ")",
@@ -287,15 +290,15 @@ class TagLink(Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
     origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
-    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     tag: Mapped[Tag] = relationship(lazy="joined")
 
 
 class TagRelation(Base):
     """Verknüpfung zwischen Hashtags: ``implies`` (Unterbegriff -> Oberbegriff), ``alias``
-    (gleichbedeutend) oder ``related`` (Hinweis). Entfernte Zeilen bleiben (``removed_at``),
+    (gleichbedeutend) oder ``related`` (Hinweis). Entfernte Zeilen bleiben (``ended_at``),
     damit eine bewusst gelöschte Startverknüpfung nicht wiederkommt."""
 
     __tablename__ = "tag_relations"
@@ -306,8 +309,8 @@ class TagRelation(Base):
             "related_key",
             "kind",
             unique=True,
-            sqlite_where=text("removed_at IS NULL"),
-            postgresql_where=text("removed_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
         Index("ix_tag_relations_related", "related_key", "kind"),
     )
@@ -319,8 +322,8 @@ class TagRelation(Base):
     related_key: Mapped[str] = mapped_column(String(40), nullable=False)
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class Application(TimestampMixin, Base):
@@ -643,7 +646,7 @@ class Document(TimestampMixin, Base):
 
 
 class PostingDocument(TimestampMixin, Base):
-    """Welche Unterlagen zu einer Bewerbung gehören. Entfernen setzt ``detached_at``."""
+    """Welche Unterlagen zu einer Bewerbung gehören. Entfernen setzt ``ended_at``."""
 
     __tablename__ = "posting_documents"
     __table_args__ = (
@@ -652,8 +655,8 @@ class PostingDocument(TimestampMixin, Base):
             "posting_id",
             "document_id",
             unique=True,
-            sqlite_where=text("detached_at IS NULL"),
-            postgresql_where=text("detached_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
     )
 
@@ -664,8 +667,8 @@ class PostingDocument(TimestampMixin, Base):
     document_id: Mapped[int] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    attached_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    detached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     document: Mapped[Document] = relationship()
 

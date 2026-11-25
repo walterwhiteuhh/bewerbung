@@ -279,7 +279,7 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
             exists().where(
                 TagLink.entity_type == TagEntity.POSTING,
                 TagLink.entity_id == JobPosting.id,
-                TagLink.removed_at.is_(None),
+                TagLink.ended_at.is_(None),
                 TagLink.tag_id.in_(ids or {-1}),
             )
         )

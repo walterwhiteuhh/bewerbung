@@ -53,7 +53,7 @@ class Graph:
         self.related: dict[str, set[str]] = defaultdict(set)
         rows = session.execute(
             select(TagRelation.tag_key, TagRelation.related_key, TagRelation.kind).where(
-                TagRelation.removed_at.is_(None)
+                TagRelation.ended_at.is_(None)
             )
         )
         for a, b, kind in rows:
@@ -113,7 +113,7 @@ def list_tags(session: Session) -> list[TagCount]:
         .join(JobPosting, JobPosting.id == TagLink.entity_id)
         .where(
             TagLink.entity_type == TagEntity.POSTING,
-            TagLink.removed_at.is_(None),
+            TagLink.ended_at.is_(None),
             JobPosting.archived_at.is_(None),
         )
     ).all()
@@ -161,7 +161,7 @@ def _names(session: Session, entity_type: str, ids: list[int] | None) -> dict[in
     stmt = (
         select(TagLink.entity_id, Tag.name)
         .join(Tag, Tag.id == TagLink.tag_id)
-        .where(TagLink.entity_type == entity_type, TagLink.removed_at.is_(None))
+        .where(TagLink.entity_type == entity_type, TagLink.ended_at.is_(None))
     )
     if ids is not None:
         stmt = stmt.where(TagLink.entity_id.in_(ids))
@@ -181,7 +181,7 @@ def tags_by_entity(session: Session, entity_type: str) -> dict[int, list[str]]:
 def set_entity_tags(
     session: Session, entity_type: str, entity_id: int, names: list[str], *, origin: str = "manual"
 ) -> list[str]:
-    """Setzt genau diese Hashtags; entfernte behalten ``removed_at`` für die Historie."""
+    """Setzt genau diese Hashtags; entfernte behalten ``ended_at`` für die Historie."""
     _check_entity(session, entity_type, entity_id)
     tags = link_tags(session, entity_type, entity_id, names, origin=origin, replace=True)
     return sorted((t.name for t in tags), key=str.casefold)
@@ -199,7 +199,7 @@ def list_relations(session: Session) -> list[dict[str, Any]]:
             TagRelation.kind,
             TagRelation.origin,
         )
-        .where(TagRelation.removed_at.is_(None))
+        .where(TagRelation.ended_at.is_(None))
         .order_by(TagRelation.related_key, TagRelation.tag_key)
     )
     return [{"id": i, "tag": x, "related": y, "kind": k, "origin": o} for i, x, y, k, o in rows]
@@ -219,7 +219,7 @@ def add_relation(session: Session, tag: str, related: str, kind: str) -> dict[st
             TagRelation.tag_key == a,
             TagRelation.related_key == b,
             TagRelation.kind == kind,
-            TagRelation.removed_at.is_(None),
+            TagRelation.ended_at.is_(None),
         )
     )
     rel = existing or TagRelation(tag_key=a, related_key=b, kind=kind, origin="manual")
@@ -231,9 +231,9 @@ def add_relation(session: Session, tag: str, related: str, kind: str) -> dict[st
 
 def remove_relation(session: Session, relation_id: int) -> None:
     rel = session.get(TagRelation, relation_id)
-    if rel is None or rel.removed_at is not None:
+    if rel is None or rel.ended_at is not None:
         raise NotFoundError("Verknüpfung", relation_id)
-    rel.removed_at = utcnow()
+    rel.ended_at = utcnow()
     session.flush()
 
 
@@ -257,8 +257,8 @@ def related_tags(session: Session, key: str, limit: int = 8) -> list[str]:
         .where(
             TagLink.entity_type == TagEntity.POSTING,
             TagLink.tag_id.in_(own_ids or {-1}),
-            TagLink.removed_at.is_(None),
-            other.removed_at.is_(None),
+            TagLink.ended_at.is_(None),
+            other.ended_at.is_(None),
             other.tag_id.not_in(own_ids or {-1}),
         )
         .group_by(other.tag_id)
@@ -291,7 +291,7 @@ def overview(session: Session, key: str) -> dict[str, Any]:
         )
         .where(
             TagLink.tag_id.in_(ids or {-1}),
-            TagLink.removed_at.is_(None),
+            TagLink.ended_at.is_(None),
             JobPosting.archived_at.is_(None),
         )
         .distinct()
@@ -306,7 +306,7 @@ def overview(session: Session, key: str) -> dict[str, Any]:
         rows = session.execute(
             select(model.id, label)
             .join(TagLink, (TagLink.entity_id == model.id) & (TagLink.entity_type == etype))
-            .where(TagLink.tag_id.in_(ids or {-1}), TagLink.removed_at.is_(None))
+            .where(TagLink.tag_id.in_(ids or {-1}), TagLink.ended_at.is_(None))
             .distinct()
         ).all()
         linked[etype.value] = [{"id": i, "label": n} for i, n in rows]

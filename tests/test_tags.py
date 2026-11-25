@@ -64,7 +64,7 @@ def test_removed_tags_are_kept_as_history(
     with create_engine(settings.database_url).connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT removed_at IS NULL FROM tag_links WHERE entity_type = 'posting' AND entity_id = :id ORDER BY id"
+                "SELECT ended_at IS NULL FROM tag_links WHERE entity_type = 'posting' AND entity_id = :id ORDER BY id"
             ),
             {"id": p["id"]},
         ).all()
