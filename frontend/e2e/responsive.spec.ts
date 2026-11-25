@@ -314,3 +314,39 @@ test.describe("Segelschiff", () => {
     await expect(ship.locator(".ship__bubble")).toContainText("Leinen los!");
   });
 });
+
+test.describe("Statuswechsel mit Grund und Gehalt", () => {
+  test("Absage speichert den Grund, Angebot das Gehalt; beides erscheint im Verlauf", async ({ page, request }) => {
+    const created = await request.post("/api/postings", {
+      data: { title: "Statusformular-Test", company_name: "Etikett GmbH", initial_status: "applied" },
+    });
+    expect(created.ok()).toBeTruthy();
+    const posting = await created.json();
+    try {
+      await page.goto("/#/");
+      await page.locator(".card", { hasText: "Statusformular-Test" }).first().click();
+      await expect(page.locator(".detail")).toBeVisible();
+
+      // Angebot: Gehaltsfeld, kein Grund
+      await page.locator(".stepper button", { hasText: "Angebot" }).click();
+      await expect(page.getByLabel("Grund")).toHaveCount(0);
+      await page.getByPlaceholder("z. B. 65.000").fill("65.000");
+      await page.getByRole("button", { name: "Übernehmen" }).click();
+      await expect(page.locator(".timeline__detail", { hasText: "65.000" })).toBeVisible();
+
+      // Absage: Grundauswahl, kein Gehalt
+      await page.locator(".exits .chip", { hasText: "Absage" }).click();
+      await expect(page.getByPlaceholder("z. B. 65.000")).toHaveCount(0);
+      await page.getByLabel("Grund").selectOption({ label: "Gehalt passt nicht" });
+      await page.getByRole("button", { name: "Übernehmen" }).click();
+      await expect(page.locator(".timeline__detail", { hasText: "Gehalt passt nicht" })).toBeVisible();
+
+      // Die Pipeline fasst Gründe und Gehälter zusammen
+      await page.goto("/#/");
+      await expect(page.locator(".outcomes__reasons li", { hasText: "Gehalt passt nicht" })).toBeVisible();
+      await expect(page.locator(".outcomes__salary")).toContainText("Angebot");
+    } finally {
+      await request.post(`/api/postings/${posting.id}/archive`);
+    }
+  });
+});

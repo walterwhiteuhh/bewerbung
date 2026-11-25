@@ -14,12 +14,14 @@ from bewerbung.db.models import (
     Company,
     JobPosting,
     Listing,
-    PostingTag,
+    TagLink,
 )
 from bewerbung.db.types import utcnow
-from bewerbung.domain.enums import ApplicationStatus, JobSource
+from bewerbung.domain.enums import ApplicationStatus, JobSource, TagEntity
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
+from bewerbung.domain.geo import place_from_payload
 from bewerbung.domain.logos import logo_from_payload
+from bewerbung.domain.matching import title_key
 from bewerbung.domain.schemas import (
     PostingCreate,
     PostingFilter,
@@ -27,7 +29,7 @@ from bewerbung.domain.schemas import (
     SourceDetection,
 )
 from bewerbung.domain.tags import tag_key
-from bewerbung.services import companies
+from bewerbung.services import companies, profile_history
 from bewerbung.services.companies import get_or_create_company
 from bewerbung.services.tag_graph import expand_filter_ids
 from bewerbung.services.tags import add_tags, set_tags
@@ -80,6 +82,7 @@ def create_posting(
     company = get_or_create_company(session, data.company_name) if data.company_name else None
     if company is not None:
         companies.enrich_from_posting(company, logo_url, data.raw_payload)
+    place = place_from_payload(data.raw_payload, data.location)
     posting = JobPosting(
         title=data.title,
         company=company,
@@ -96,6 +99,12 @@ def create_posting(
         url_normalized=url_normalized,
         raw_payload=data.raw_payload,
         posted_at=data.posted_at,
+        title_key=title_key(data.title),
+        city=place.city,
+        postal_code=place.postal_code,
+        region=place.region,
+        lat=place.lat,
+        lon=place.lon,
     )
     now = utcnow()
     application = Application(
@@ -105,6 +114,11 @@ def create_posting(
         # Jeder Status außer "gemerkt" setzt voraus, dass die Bewerbung raus ist.
         applied_at=None if data.initial_status is ApplicationStatus.SAVED else now,
         priority=data.priority,
+        profile_version_id=(
+            None
+            if data.initial_status is ApplicationStatus.SAVED
+            else profile_history.current_version_id(session)
+        ),
     )
     application.events.append(
         ApplicationStatusEvent(from_status=None, to_status=data.initial_status, occurred_at=now)
@@ -158,6 +172,24 @@ def get_posting(session: Session, posting_id: int) -> JobPosting:
     return posting
 
 
+def _apply_place(posting: JobPosting) -> None:
+    place = place_from_payload(posting.raw_payload, posting.location)
+    posting.city, posting.postal_code, posting.region = (
+        place.city,
+        place.postal_code,
+        place.region,
+    )
+    posting.lat, posting.lon = place.lat, place.lon
+
+
+def _refresh_derived(posting: JobPosting, changes: dict[str, Any]) -> None:
+    """Abgeleitete Felder folgen manuellen Korrekturen."""
+    if "title" in changes:
+        posting.title_key = title_key(posting.title)
+    if "location" in changes:
+        _apply_place(posting)
+
+
 def update_posting(
     session: Session, registry: SourceRegistry, posting_id: int, data: PostingUpdate
 ) -> JobPosting:
@@ -195,6 +227,8 @@ def update_posting(
 
     for field, value in changes.items():
         setattr(posting, field, value)
+
+    _refresh_derived(posting, changes)
 
     if (
         posting.salary_min is not None
@@ -243,9 +277,10 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
     for ids in expand_filter_ids(session, keys) if keys else []:
         where.append(
             exists().where(
-                PostingTag.posting_id == JobPosting.id,
-                PostingTag.removed_at.is_(None),
-                PostingTag.tag_id.in_(ids or {-1}),
+                TagLink.entity_type == TagEntity.POSTING,
+                TagLink.entity_id == JobPosting.id,
+                TagLink.ended_at.is_(None),
+                TagLink.tag_id.in_(ids or {-1}),
             )
         )
     if flt.location:

@@ -79,3 +79,32 @@ def test_stats(client: TestClient, make_posting) -> None:
     # 3 x "gemerkt" beim Anlegen + 3 Wechsel, alle innerhalb der letzten 7 Tage
     assert stats["activity_7d"] == 6
     assert stats["last_activity_at"] is not None
+
+
+def test_stats_aggregate_reasons_and_offer_salaries(client: TestClient, make_posting) -> None:
+    def new(title: str) -> int:
+        app_id = make_posting(title=title, initial_status="applied")["application"]["id"]
+        return app_id
+
+    a, b, c, d = new("A"), new("B"), new("C"), new("D")
+    _status(client, a, "rejected", reason_code="salary_mismatch")
+    _status(client, b, "rejected", reason_code="salary_mismatch")
+    _status(client, c, "offer", offered_salary=60000)
+    _status(client, d, "offer", offered_salary=70000, offered_currency="eur")
+    # Spätere Aussage ersetzt die frühere: erst 70k, nach Verhandlung 80k
+    _status(client, d, "accepted", offered_salary=80000)
+
+    stats = client.get("/api/stats").json()
+    assert stats["by_reason"] == [{"key": "salary_mismatch", "count": 2}]
+    assert stats["offer_salaries"] == [
+        {"currency": "EUR", "count": 2, "min": 60000, "median": 70000, "max": 80000}
+    ]
+
+
+def test_stats_ignore_archived_postings_for_labels(client: TestClient, make_posting) -> None:
+    p = make_posting(initial_status="applied")
+    _status(client, p["application"]["id"], "rejected", reason_code="position_filled")
+    client.post(f"/api/postings/{p['id']}/archive")
+    stats = client.get("/api/stats").json()
+    assert stats["by_reason"] == []
+    assert stats["offer_salaries"] == []

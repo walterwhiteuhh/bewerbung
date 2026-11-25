@@ -70,6 +70,29 @@ _FUNNEL: dict[ApplicationStatus, int] = {
 }
 
 
+class TagEntity(StrEnum):
+    """Objekttypen, an denen Hashtags hängen (``tag_links.entity_type``)."""
+
+    POSTING = "posting"
+    COMPANY = "company"
+    DOCUMENT = "document"
+    SEARCH_PROFILE = "search_profile"
+
+
+class OutcomeReason(StrEnum):
+    """Strukturierter Grund für einen Endzustand (Label für spätere Modelle)."""
+
+    NO_RESPONSE = "no_response"  # nie Rückmeldung bekommen
+    REJECTED_SCREENING = "rejected_screening"  # Absage nach Unterlagen
+    REJECTED_INTERVIEW = "rejected_interview"  # Absage nach Gespräch
+    POSITION_FILLED = "position_filled"
+    SALARY_MISMATCH = "salary_mismatch"
+    LOCATION_MISMATCH = "location_mismatch"
+    BETTER_OFFER = "better_offer"
+    OWN_DECISION = "own_decision"  # selbst abgesagt / Interesse verloren
+    OTHER = "other"
+
+
 # Filter der Portalsuche (Arbeitszeit, Angebotsart).
 WorkTime = Literal["vollzeit", "teilzeit", "minijob", "schicht"]
 OfferType = Literal["arbeit", "ausbildung", "praktikum", "selbststaendig"]

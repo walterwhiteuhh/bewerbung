@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from statistics import median
+from typing import Any
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import Select, SQLColumnExpression, distinct, func, select
 from sqlalchemy.orm import Session
 
 from bewerbung.db.models import Application, ApplicationStatusEvent, JobPosting
 from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus
-from bewerbung.domain.schemas import CountBucket, Stats
+from bewerbung.domain.schemas import CountBucket, SalaryStat, Stats
 
 _RESPONSE_STATUSES = (
     ApplicationStatus.IN_REVIEW,
@@ -19,6 +21,48 @@ _RESPONSE_STATUSES = (
     ApplicationStatus.ACCEPTED,
     ApplicationStatus.REJECTED,
 )
+
+
+def _latest_labelled_events(column: SQLColumnExpression[Any]) -> Select[Any]:
+    """Je Bewerbung das zuletzt erfasste Ereignis, das ``column`` gesetzt hat (aktive Stellen).
+
+    Events sind append-only und ``change_status`` hält ``occurred_at`` monoton, daher
+    entspricht die höchste ID dem jüngsten Ereignis.
+    """
+    latest = (
+        select(func.max(ApplicationStatusEvent.id))
+        .where(column.is_not(None))
+        .group_by(ApplicationStatusEvent.application_id)
+        .scalar_subquery()
+    )
+    return (
+        select(ApplicationStatusEvent)
+        .join(Application, Application.id == ApplicationStatusEvent.application_id)
+        .join(JobPosting, JobPosting.id == Application.posting_id)
+        .where(JobPosting.archived_at.is_(None), ApplicationStatusEvent.id.in_(latest))
+    )
+
+
+def _reason_buckets(session: Session) -> list[CountBucket]:
+    ev = _latest_labelled_events(ApplicationStatusEvent.reason_code).subquery()
+    rows = session.execute(
+        select(ev.c.reason_code, func.count())
+        .group_by(ev.c.reason_code)
+        .order_by(func.count().desc(), ev.c.reason_code)
+    ).all()
+    return [CountBucket(key=reason, count=count) for reason, count in rows]
+
+
+def _salary_stats(session: Session) -> list[SalaryStat]:
+    ev = _latest_labelled_events(ApplicationStatusEvent.offered_salary).subquery()
+    by_currency: dict[str, list[int]] = {}
+    for currency, salary in session.execute(select(ev.c.offered_currency, ev.c.offered_salary)):
+        by_currency.setdefault(currency or "EUR", []).append(salary)
+    stats = [
+        SalaryStat(currency=cur, count=len(v), min=min(v), median=round(median(v)), max=max(v))
+        for cur, v in by_currency.items()
+    ]
+    return sorted(stats, key=lambda x: (-x.count, x.currency))
 
 
 def compute_stats(session: Session) -> Stats:
@@ -89,4 +133,6 @@ def compute_stats(session: Session) -> Stats:
         response_rate=round(responded / applied, 3) if applied else None,
         activity_7d=activity_7d or 0,
         last_activity_at=last_activity_at,
+        by_reason=_reason_buckets(session),
+        offer_salaries=_salary_stats(session),
     )

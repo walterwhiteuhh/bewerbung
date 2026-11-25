@@ -8,11 +8,15 @@ Designprinzipien:
 * Events sind bitemporal: ``occurred_at`` (wann es fachlich passiert ist, darf
   rückdatiert werden) und ``recorded_at`` (wann es erfasst wurde). So lassen sich
   später Trainingsdaten "as of" einem Stichtag ohne Data Leakage rekonstruieren.
+* Zuordnungen mit Gültigkeit (Hashtags, Unterlagen, Haupt-Lebenslauf, Tag-Verknüpfungen)
+  heißen einheitlich ``started_at`` .. ``ended_at`` (offen = ``ended_at IS NULL``);
+  ``archived_at`` bleibt dem Soft-Delete eines Objekts vorbehalten.
 * Löschen ist ein Soft-Delete (``archived_at``), Rohdaten der Quelle bleiben in
   ``raw_payload`` erhalten.
-* Hashtags hängen über ``posting_tags`` an Stellen. Entfernen setzt ``removed_at``
-  statt zu löschen, sodass sich nachvollziehen lässt, wann eine Stelle wie
-  eingeordnet war (Labels für spätere Modelle).
+* Hashtags hängen über ``tag_links`` an Stellen, Firmen, Unterlagen und Suchen (ein
+  Mechanismus für alle Objekttypen). Entfernen setzt ``ended_at`` statt zu löschen,
+  sodass sich nachvollziehen lässt, wann ein Objekt wie eingeordnet war (Labels für
+  spätere Modelle).
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from bewerbung.db.types import UTCDateTime, utcnow
-from bewerbung.domain.enums import ApplicationStatus, JobSource, RemoteType
+from bewerbung.domain.enums import ApplicationStatus, JobSource, RemoteType, TagEntity
 from bewerbung.domain.ratings import EmployerScore, RatingValue, aggregate
 
 NAMING_CONVENTION = {
@@ -69,6 +73,32 @@ class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class PlaceMixin:
+    """Strukturierter Ort; Koordinaten nur, wenn die Quelle sie liefert (Stelle und Anzeige)."""
+
+    city: Mapped[str | None] = mapped_column(String(120))
+    postal_code: Mapped[str | None] = mapped_column(String(10))
+    region: Mapped[str | None] = mapped_column(String(120))
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
+
+
+class SearchParamsMixin:
+    """Suchparameter; gespeicherte Suche und Suchlauf (Snapshot) teilen dieselben Felder."""
+
+    query: Mapped[str] = mapped_column(String(255), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(255))
+    radius_km: Mapped[int | None] = mapped_column(Integer)
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
+    work_times: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    offer_type: Mapped[str] = mapped_column(
+        String(32), default="arbeit", server_default="arbeit", nullable=False
     )
 
 
@@ -140,7 +170,7 @@ class CompanyRating(Base):
     company: Mapped[Company] = relationship(back_populates="ratings")
 
 
-class JobPosting(TimestampMixin, Base):
+class JobPosting(TimestampMixin, PlaceMixin, Base):
     __tablename__ = "job_postings"
     __table_args__ = (
         # Dublettenschutz pro Quelle, nur wenn die Quelle eine ID liefert.
@@ -154,6 +184,7 @@ class JobPosting(TimestampMixin, Base):
         ),
         Index("ix_job_postings_url_normalized", "url_normalized"),
         Index("ix_job_postings_source_created", "source", "created_at"),
+        Index("ix_job_postings_company_title", "company_id", "title_key"),
         CheckConstraint(
             "salary_min IS NULL OR salary_max IS NULL OR salary_min <= salary_max",
             name="salary_range",
@@ -174,6 +205,8 @@ class JobPosting(TimestampMixin, Base):
     salary_max: Mapped[int | None] = mapped_column(Integer)
     salary_currency: Mapped[str] = mapped_column(String(3), default="EUR", nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    # Abgeleitet wie bei ``Listing``, damit Analysen nicht über ``listings`` joinen müssen.
+    title_key: Mapped[str | None] = mapped_column(String(255))
 
     source: Mapped[JobSource] = mapped_column(_enum(JobSource, "job_source"), nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(128))
@@ -190,8 +223,13 @@ class JobPosting(TimestampMixin, Base):
     applications: Mapped[list[Application]] = relationship(
         back_populates="posting", order_by="Application.id"
     )
-    tag_links: Mapped[list[PostingTag]] = relationship(
-        back_populates="posting", order_by="PostingTag.id"
+    # Nur lesend: geschrieben wird über services.tags (ein Weg für alle Objekttypen).
+    tag_links: Mapped[list[TagLink]] = relationship(
+        primaryjoin=(
+            "and_(TagLink.entity_type == 'posting', foreign(TagLink.entity_id) == JobPosting.id)"
+        ),
+        order_by="TagLink.id",
+        viewonly=True,
     )
 
     @property
@@ -203,7 +241,7 @@ class JobPosting(TimestampMixin, Base):
     def tags(self) -> list[str]:
         """Aktuell gesetzte Hashtags (ohne entfernte), alphabetisch."""
         return sorted(
-            (link.tag.name for link in self.tag_links if link.removed_at is None),
+            (link.tag.name for link in self.tag_links if link.ended_at is None),
             key=str.casefold,
         )
 
@@ -219,11 +257,13 @@ class Tag(TimestampMixin, Base):
 
 
 class TagLink(Base):
-    """Hashtag an Firma, Unterlage oder gespeicherter Suche (``entity_type``/``entity_id``).
+    """Hashtag an Stelle, Firma, Unterlage oder Suche (``entity_type``/``entity_id``).
 
-    Allgemeiner als ``posting_tags``: derselbe Hashtag gilt übergreifend für alle Objekte.
-    Ohne Fremdschlüssel auf das Objekt, dafür bereinigt der Service beim Löschen.
-    Wie bei Stellen mit Zeitraum (added_at .. removed_at), damit die Historie erhalten bleibt.
+    Derselbe Hashtag gilt übergreifend für alle Objekte. Ohne Fremdschlüssel auf das Objekt
+    (die ID zeigt auf mehrere Tabellen): ein CHECK begrenzt ``entity_type``, DB-Trigger
+    (SQLite) und Service beenden die Zuordnung beim Löschen. Mit Zeitraum
+    (started_at .. ended_at), damit die Historie erhalten bleibt. ``origin``: "manual"
+    (Formular/Detail), "note" (#tag in Notiz), "auto" (aus der Beschreibung).
     """
 
     __tablename__ = "tag_links"
@@ -234,11 +274,15 @@ class TagLink(Base):
             "entity_id",
             "tag_id",
             unique=True,
-            sqlite_where=text("removed_at IS NULL"),
-            postgresql_where=text("removed_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
-        Index("ix_tag_links_tag_removed", "tag_id", "removed_at"),
+        Index("ix_tag_links_tag_ended", "tag_id", "ended_at"),
         Index("ix_tag_links_entity", "entity_type", "entity_id"),
+        CheckConstraint(
+            "entity_type IN (" + ", ".join(f"'{e.value}'" for e in TagEntity) + ")",
+            name="entity_type",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -246,15 +290,15 @@ class TagLink(Base):
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
     origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
-    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     tag: Mapped[Tag] = relationship(lazy="joined")
 
 
 class TagRelation(Base):
     """Verknüpfung zwischen Hashtags: ``implies`` (Unterbegriff -> Oberbegriff), ``alias``
-    (gleichbedeutend) oder ``related`` (Hinweis). Entfernte Zeilen bleiben (``removed_at``),
+    (gleichbedeutend) oder ``related`` (Hinweis). Entfernte Zeilen bleiben (``ended_at``),
     damit eine bewusst gelöschte Startverknüpfung nicht wiederkommt."""
 
     __tablename__ = "tag_relations"
@@ -265,8 +309,8 @@ class TagRelation(Base):
             "related_key",
             "kind",
             unique=True,
-            sqlite_where=text("removed_at IS NULL"),
-            postgresql_where=text("removed_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
         Index("ix_tag_relations_related", "related_key", "kind"),
     )
@@ -278,39 +322,8 @@ class TagRelation(Base):
     related_key: Mapped[str] = mapped_column(String(40), nullable=False)
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-
-
-class PostingTag(Base):
-    """Zuordnung Stelle <-> Hashtag mit Gültigkeitszeitraum (added_at .. removed_at)."""
-
-    __tablename__ = "posting_tags"
-    __table_args__ = (
-        # Pro Stelle und Tag höchstens eine aktive Zuordnung.
-        Index(
-            "uq_posting_tags_active",
-            "posting_id",
-            "tag_id",
-            unique=True,
-            sqlite_where=text("removed_at IS NULL"),
-            postgresql_where=text("removed_at IS NULL"),
-        ),
-        Index("ix_posting_tags_tag_removed", "tag_id", "removed_at"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    posting_id: Mapped[int] = mapped_column(
-        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
-    # Herkunft: "manual" (Formular/Detail), "note" (#tag in Notiz), "auto" (aus der Beschreibung).
-    origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
-    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-
-    posting: Mapped[JobPosting] = relationship(back_populates="tag_links")
-    tag: Mapped[Tag] = relationship(lazy="joined")
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class Application(TimestampMixin, Base):
@@ -333,6 +346,10 @@ class Application(TimestampMixin, Base):
     contact_name: Mapped[str | None] = mapped_column(String(255))
     contact_email: Mapped[str | None] = mapped_column(String(255))
     follow_up_at: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
+    # Profilstand beim Absenden: Feature-Snapshot "as of" für spätere Modelle.
+    profile_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("applicant_profile_versions.id", ondelete="SET NULL"), index=True
+    )
 
     posting: Mapped[JobPosting] = relationship(back_populates="applications")
     events: Mapped[list[ApplicationStatusEvent]] = relationship(
@@ -351,6 +368,7 @@ class ApplicationStatusEvent(Base):
     __table_args__ = (
         Index("ix_status_events_app_occurred", "application_id", "occurred_at"),
         Index("ix_status_events_to_status", "to_status"),
+        CheckConstraint("offered_salary IS NULL OR offered_salary >= 0", name="offered_salary"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -364,6 +382,11 @@ class ApplicationStatusEvent(Base):
         _enum(ApplicationStatus, "application_status"), nullable=False
     )
     note: Mapped[str | None] = mapped_column(Text)
+    # Strukturiertes Label (Absagegrund, Rückzugsgrund) und Jahresgehalt eines Angebots:
+    # wertvollste Zielgrößen für spätere Modelle, daher nicht im Freitext verstecken.
+    reason_code: Mapped[str | None] = mapped_column(String(32))
+    offered_salary: Mapped[int | None] = mapped_column(Integer)
+    offered_currency: Mapped[str | None] = mapped_column(String(3))
     occurred_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
@@ -382,7 +405,7 @@ class Note(TimestampMixin, Base):
     application: Mapped[Application] = relationship(back_populates="notes")
 
 
-class Listing(TimestampMixin, Base):
+class Listing(TimestampMixin, PlaceMixin, Base):
     """Eine Anzeige so, wie ein Portal sie zeigt (Rohsicht pro Quelle).
 
     * ``posting_id IS NULL``: Suchtreffer, noch nicht gemerkt.
@@ -423,12 +446,6 @@ class Listing(TimestampMixin, Base):
         ForeignKey("companies.id", ondelete="SET NULL"), index=True
     )
     title_key: Mapped[str | None] = mapped_column(String(255))
-    # Strukturierter Ort aus den Rohdaten; Koordinaten nur, wenn die Quelle sie liefert.
-    city: Mapped[str | None] = mapped_column(String(120))
-    postal_code: Mapped[str | None] = mapped_column(String(10))
-    region: Mapped[str | None] = mapped_column(String(120))
-    lat: Mapped[float | None] = mapped_column(Float)
-    lon: Mapped[float | None] = mapped_column(Float)
     location: Mapped[str | None] = mapped_column(String(255))
     remote_type: Mapped[RemoteType] = mapped_column(
         _enum(RemoteType, "remote_type"), default=RemoteType.UNKNOWN, nullable=False
@@ -449,30 +466,19 @@ class Listing(TimestampMixin, Base):
     posting: Mapped[JobPosting | None] = relationship(back_populates="listings")
 
 
-class SearchProfile(TimestampMixin, Base):
+class SearchProfile(TimestampMixin, SearchParamsMixin, Base):
     """Gespeicherte Suche, die man erneut ausführen kann."""
 
     __tablename__ = "search_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    query: Mapped[str] = mapped_column(String(255), nullable=False)
-    location: Mapped[str | None] = mapped_column(String(255))
-    radius_km: Mapped[int | None] = mapped_column(Integer)
-    sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
-    work_times: Mapped[list[str]] = mapped_column(
-        JSON, default=list, server_default=text("'[]'"), nullable=False
-    )
-    offer_type: Mapped[str] = mapped_column(
-        String(32), default="arbeit", server_default="arbeit", nullable=False
-    )
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     runs: Mapped[list[SearchRun]] = relationship(back_populates="profile")
 
 
-class SearchRun(Base):
+class SearchRun(SearchParamsMixin, Base):
     """Ein Suchlauf (append-only). Parameter werden als Snapshot gespeichert,
     damit spätere Änderungen am Profil die Historie nicht verfälschen."""
 
@@ -481,17 +487,6 @@ class SearchRun(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("search_profiles.id", ondelete="SET NULL"), index=True
-    )
-    query: Mapped[str] = mapped_column(String(255), nullable=False)
-    location: Mapped[str | None] = mapped_column(String(255))
-    radius_km: Mapped[int | None] = mapped_column(Integer)
-    sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
-    work_times: Mapped[list[str]] = mapped_column(
-        JSON, default=list, server_default=text("'[]'"), nullable=False
-    )
-    offer_type: Mapped[str] = mapped_column(
-        String(32), default="arbeit", server_default="arbeit", nullable=False
     )
     started_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utcnow, nullable=False, index=True
@@ -556,6 +551,26 @@ class ApplicantProfile(TimestampMixin, Base):
         return self.home_lat is not None and self.home_lon is not None
 
     signature: Mapped[str | None] = mapped_column(Text)
+
+
+class ApplicantProfileVersion(Base):
+    """Append-only Schnappschuss des Profils (nur bei Änderung).
+
+    ``applicant_profiles`` wird überschrieben; ohne Verlauf wäre später nicht mehr
+    rekonstruierbar, mit welchem Stand (Skills, Lebenslauf, Wohnort) eine Bewerbung
+    rausging. ``content_hash`` verhindert Duplikate bei unveränderten Speichervorgängen.
+    """
+
+    __tablename__ = "applicant_profile_versions"
+    __table_args__ = (Index("ix_profile_versions_profile_created", "profile_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("applicant_profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
 
 class CoverLetter(TimestampMixin, Base):
@@ -631,7 +646,7 @@ class Document(TimestampMixin, Base):
 
 
 class PostingDocument(TimestampMixin, Base):
-    """Welche Unterlagen zu einer Bewerbung gehören. Entfernen setzt ``detached_at``."""
+    """Welche Unterlagen zu einer Bewerbung gehören. Entfernen setzt ``ended_at``."""
 
     __tablename__ = "posting_documents"
     __table_args__ = (
@@ -640,8 +655,8 @@ class PostingDocument(TimestampMixin, Base):
             "posting_id",
             "document_id",
             unique=True,
-            sqlite_where=text("detached_at IS NULL"),
-            postgresql_where=text("detached_at IS NULL"),
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
         ),
     )
 
@@ -652,7 +667,31 @@ class PostingDocument(TimestampMixin, Base):
     document_id: Mapped[int] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    attached_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
-    detached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     document: Mapped[Document] = relationship()
+
+
+class DocumentPrimaryPeriod(Base):
+    """Zeitraum, in dem eine Unterlage Haupt-Lebenslauf war (``is_primary`` allein ist nur
+    der aktuelle Stand). Offen = ``ended_at IS NULL``."""
+
+    __tablename__ = "document_primary_periods"
+    __table_args__ = (
+        Index(
+            "uq_document_primary_open",
+            "document_id",
+            unique=True,
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+        Index("ix_document_primary_started", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

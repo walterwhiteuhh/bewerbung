@@ -461,6 +461,11 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   scroll-snap-type: x proximity;
 }
 .chips::-webkit-scrollbar { display: none; }
+
+.outcomes { display: grid; gap: 6px; font-size: 0.875rem; color: var(--on-band-muted); }
+.outcomes__salary { color: var(--on-band); font-weight: 550; }
+.outcomes__reasons { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; padding: 0; margin: 0; }
+.outcomes__reasons strong { color: var(--on-band); font-variant-numeric: tabular-nums; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -710,6 +715,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .timeline__item:last-child::before { display: none; }
 .timeline__dot { width: 12px; height: 12px; margin: 5px 4px; border-radius: 50%; background: var(--c, var(--surface-2)); border: 2px solid var(--c, var(--border)); }
 .timeline__event { font-weight: 550; }
+.timeline__detail { font-size: 0.875rem; color: var(--accent, inherit); font-weight: 500; margin: 0.1rem 0; }
 
 /* --- Dialog -------------------------------------------------------------- */
 .dialog {

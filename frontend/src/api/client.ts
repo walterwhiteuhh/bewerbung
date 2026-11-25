@@ -28,6 +28,7 @@ import type {
   Profile,
   DocumentInfo,
   DocumentKind,
+  StatusOutcome,
 } from "./types";
 
 export class ApiError extends Error {
@@ -99,10 +100,17 @@ export const api = {
   detectSource: (url: string) =>
     request<SourceDetection>(`/sources/detect?${new URLSearchParams({ url })}`),
   importPreview: (url: string) => request<ImportPreview>("/sources/import", json("POST", { url })),
-  changeStatus: (appId: number, status: ApplicationStatus, note?: string, occurredAt?: string) =>
+  changeStatus: (appId: number, status: ApplicationStatus, note?: string, occurredAt?: string, outcome: StatusOutcome = {}) =>
     request<Application>(
       `/applications/${appId}/status`,
-      json("POST", { status, note: note || null, occurred_at: occurredAt ?? null }),
+      json("POST", {
+        status,
+        note: note || null,
+        occurred_at: occurredAt ?? null,
+        reason_code: outcome.reasonCode ?? null,
+        offered_salary: outcome.offeredSalary ?? null,
+        offered_currency: outcome.offeredCurrency ?? null,
+      }),
     ),
   updateApplication: (appId: number, data: Partial<Pick<Application, "priority" | "contact_name" | "contact_email" | "follow_up_at">>) =>
     request<Application>(`/applications/${appId}`, json("PATCH", data)),

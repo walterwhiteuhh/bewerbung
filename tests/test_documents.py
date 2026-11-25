@@ -169,7 +169,7 @@ def test_posting_documents_keep_history(client: TestClient, make_posting) -> Non
     factory = client.app.state.session_factory  # type: ignore[attr-defined]
     with factory() as s:
         links = s.scalars(select(PostingDocument).order_by(PostingDocument.id)).all()
-        assert [(lnk.document_id, lnk.detached_at is None) for lnk in links] == [
+        assert [(lnk.document_id, lnk.ended_at is None) for lnk in links] == [
             (cv["id"], False),
             (cert["id"], True),
         ]

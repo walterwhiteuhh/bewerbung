@@ -15,7 +15,14 @@ from pydantic import (
     model_validator,
 )
 
-from bewerbung.domain.enums import ApplicationStatus, JobSource, OfferType, RemoteType, WorkTime
+from bewerbung.domain.enums import (
+    ApplicationStatus,
+    JobSource,
+    OfferType,
+    OutcomeReason,
+    RemoteType,
+    WorkTime,
+)
 from bewerbung.domain.ratings import RatingSource
 from bewerbung.domain.tags import unique_tags
 
@@ -247,6 +254,9 @@ class StatusEventRead(_Schema):
     from_status: ApplicationStatus | None
     to_status: ApplicationStatus
     note: str | None
+    reason_code: OutcomeReason | None
+    offered_salary: int | None
+    offered_currency: str | None
     occurred_at: datetime
     recorded_at: datetime
 
@@ -284,6 +294,13 @@ class StatusChange(_Schema):
     occurred_at: UtcDatetime | None = Field(
         default=None, description="Fachlicher Zeitpunkt; leer = jetzt. Rückdatieren erlaubt."
     )
+    reason_code: OutcomeReason | None = Field(
+        default=None, description="Grund; nur bei Absage, Rückzug oder Zusage/Angebot sinnvoll"
+    )
+    offered_salary: int | None = Field(
+        default=None, ge=0, le=10_000_000, description="Jahresgehalt eines Angebots"
+    )
+    offered_currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 
 class ApplicationUpdate(_Schema):
@@ -369,6 +386,16 @@ class CountBucket(_Schema):
     count: int
 
 
+class SalaryStat(_Schema):
+    """Angebotsgehälter (Jahresgehalt) je Währung; je Bewerbung zählt das zuletzt genannte."""
+
+    currency: str
+    count: int
+    min: int
+    median: int
+    max: int
+
+
 class Stats(_Schema):
     total: int
     active: int
@@ -381,6 +408,13 @@ class Stats(_Schema):
         default=0, description="Statuswechsel der letzten 7 Tage (nach occurred_at)"
     )
     last_activity_at: datetime | None = None
+    by_reason: list[CountBucket] = Field(
+        default_factory=list,
+        description="Gründe von Absagen/Rückzügen; je Bewerbung zählt der zuletzt genannte",
+    )
+    offer_salaries: list[SalaryStat] = Field(
+        default_factory=list, description="Gehälter genannter Angebote, größte Gruppe zuerst"
+    )
 
 
 # --- Live-Suche ----------------------------------------------------------------

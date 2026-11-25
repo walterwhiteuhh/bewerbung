@@ -14,6 +14,7 @@ from bewerbung.domain.enums import ApplicationStatus
 from bewerbung.domain.errors import InvalidTransitionError, NotFoundError
 from bewerbung.domain.schemas import ApplicationUpdate, NoteCreate, StatusChange
 from bewerbung.domain.tags import extract_hashtags
+from bewerbung.services import profile_history
 from bewerbung.services.tags import add_tags
 
 logger = logging.getLogger(__name__)
@@ -48,11 +49,25 @@ def change_status(session: Session, application_id: int, change: StatusChange) -
         raise InvalidTransitionError("Statuswechsel darf nicht in der Zukunft liegen")
     if occurred_at < application.status_changed_at:
         raise InvalidTransitionError("Zeitpunkt liegt vor dem letzten Statuswechsel")
+    if change.reason_code is not None and not (
+        change.status.is_terminal or change.status is ApplicationStatus.OFFER
+    ):
+        raise InvalidTransitionError("Ein Grund ist nur bei Angebot oder Endzustand möglich")
+    if change.offered_salary is not None and change.status not in {
+        ApplicationStatus.OFFER,
+        ApplicationStatus.ACCEPTED,
+    }:
+        raise InvalidTransitionError("Ein Gehalt ist nur bei Angebot oder Zusage möglich")
 
     event = ApplicationStatusEvent(
         from_status=application.current_status,
         to_status=change.status,
         note=change.note,
+        reason_code=change.reason_code.value if change.reason_code else None,
+        offered_salary=change.offered_salary,
+        offered_currency=(
+            (change.offered_currency or "EUR").upper() if change.offered_salary else None
+        ),
         occurred_at=occurred_at,
         recorded_at=now,
     )
@@ -61,6 +76,7 @@ def change_status(session: Session, application_id: int, change: StatusChange) -
     application.status_changed_at = occurred_at
     if application.applied_at is None and change.status is not ApplicationStatus.SAVED:
         application.applied_at = occurred_at
+        application.profile_version_id = profile_history.current_version_id(session)
 
     session.flush()
     logger.info("Bewerbung %s: %s -> %s", application.id, event.from_status, event.to_status)
