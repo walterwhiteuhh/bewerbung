@@ -362,3 +362,21 @@ def test_adzuna_minijob_uses_part_time_and_keyword() -> None:
 
     provider = AdzunaProvider("id", "key", transport=httpx.MockTransport(handler))
     assert asyncio.run(provider.search(SearchQuery(query="kasse", work_times=["minijob"]))) == []
+
+
+def test_arbeitsagentur_marks_minijob_and_search_keeps_known_values(
+    search_client: TestClient, aa: FakeProvider
+) -> None:
+    d = to_draft({"refnr": "x-1", "titel": "Aushilfe", "istGeringfuegigeBeschaeftigung": True})
+    assert d is not None
+    assert d.employment_type == "Minijob"
+
+    aa.drafts = [aa.drafts[0].model_copy(update={"employment_type": "Minijob"})]
+    first = search_client.post("/api/search", json={"query": "x"}).json()
+    listing_id = first["hits"][0]["listing"]["id"]
+    # Gleiche Anzeige, diesmal ohne Arbeitszeit-Angabe, aber geändertem Inhalt
+    aa.drafts = [aa.drafts[0].model_copy(update={"employment_type": None, "title": "Neu"})]
+    again = search_client.post("/api/search", json={"query": "x"}).json()
+    hit = next(h for h in again["hits"] if h["listing"]["id"] == listing_id)
+    assert hit["listing"]["title"] == "Neu"
+    assert hit["listing"]["employment_type"] == "Minijob"

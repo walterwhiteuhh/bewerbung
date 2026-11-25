@@ -127,7 +127,7 @@ def extract_text(data: bytes, ftype: FileType) -> Extraction:
         if ftype is DOCX:
             return _docx(data)
         if ftype is TEXT:
-            return Extraction(_clean(data.decode("utf-8")), None)
+            return Extraction(_clean(data.decode("utf-8-sig")), None)
     except Exception as exc:
         logger.warning("Text konnte nicht ausgelesen werden (%s): %s", ftype.label, exc)
         return Extraction(None, None, "Text konnte nicht ausgelesen werden")

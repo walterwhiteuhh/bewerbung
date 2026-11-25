@@ -23,6 +23,9 @@ class JobSource(StrEnum):
     WORKDAY = "workday"
     # Aggregatoren mit offizieller Such-API
     ADZUNA = "adzuna"
+    JOOBLE = "jooble"
+    ARBEITNOW = "arbeitnow"
+    REMOTIVE = "remotive"
     OTHER = "other"
 
 

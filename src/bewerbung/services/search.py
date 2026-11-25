@@ -86,7 +86,10 @@ def upsert_listing(
 
     if listing.content_hash != content_hash:
         for key, value in fields.items():
-            setattr(listing, key, value)
+            # Fehlt ein Feld in diesem Lauf (z. B. ungefilterte Suche ohne Arbeitszeit),
+            # ist das keine Löschung: bekannte Werte bleiben stehen.
+            if value is not None:
+                setattr(listing, key, value)
         listing.content_hash = content_hash
         listing.raw_payload = draft.raw
     listing.last_seen_at = now

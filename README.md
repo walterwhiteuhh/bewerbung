@@ -99,6 +99,12 @@ Suchwort ergänzt.
 |---|---|
 | Bundesagentur für Arbeit | keine (öffentliche Jobsuche-API) |
 | Adzuna (bündelt viele Portale) | kostenlosen Key auf https://developer.adzuna.com holen, dann in `.env`: `BEWERBUNG_ADZUNA_APP_ID=...` und `BEWERBUNG_ADZUNA_APP_KEY=...` |
+| Jooble (bündelt sehr viele Jobbörsen und Karriereseiten) | kostenlosen Key auf https://jooble.org/api/about anfordern, dann in `.env`: `BEWERBUNG_JOOBLE_API_KEY=...` |
+| Arbeitnow (Deutschland/Europa, oft englischsprachig) | keine; die API hat keine Suchfunktion, die App lädt die neuesten ~300 Anzeigen und filtert selbst |
+| Remotive (nur Remote-Stellen) | keine; nur Anzeigen, die aus Deutschland/Europa besetzt werden dürfen |
+
+LinkedIn, StepStone, Indeed und XING bieten keine öffentliche Such-API und blockieren automatische
+Abrufe. Deren Anzeigen kommen über Jooble/Adzuna (die viele davon bündeln) oder per Link-Import.
 
 Treffer werden als `listings` gespeichert (`first_seen_at`/`last_seen_at`, `content_hash`),
 jeder Lauf mit Rang in `search_runs`/`search_hits`. „Merken“ legt Stelle und Bewerbung an und
