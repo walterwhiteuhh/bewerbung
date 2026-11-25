@@ -20,6 +20,8 @@ class JobSource(StrEnum):
     SOFTGARDEN = "softgarden"
     JOIN = "join"
     WORKDAY = "workday"
+    # Aggregatoren mit offizieller Such-API
+    ADZUNA = "adzuna"
     OTHER = "other"
 
 

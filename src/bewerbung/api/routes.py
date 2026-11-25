@@ -6,12 +6,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from bewerbung.api.deps import FetcherDep, RegistryDep, SessionDep
+from bewerbung.api.deps import FetcherDep, ProvidersDep, RegistryDep, SessionDep
 from bewerbung.domain.schemas import (
     ApplicationRead,
     ApplicationUpdate,
     ImportPreview,
     ImportRequest,
+    ListingRead,
     NoteCreate,
     NoteRead,
     PostingCreate,
@@ -20,11 +21,18 @@ from bewerbung.domain.schemas import (
     PostingListItem,
     PostingPage,
     PostingUpdate,
+    ProviderInfo,
+    SaveListing,
+    SearchProfileCreate,
+    SearchProfileRead,
+    SearchRequest,
+    SearchRunRead,
+    SearchRunSummary,
     SourceDetection,
     Stats,
     StatusChange,
 )
-from bewerbung.services import applications, importer, postings, stats
+from bewerbung.services import applications, importer, postings, search, stats
 
 router = APIRouter(prefix="/api")
 
@@ -138,6 +146,70 @@ def change_status(session: SessionDep, application_id: int, data: StatusChange) 
 )
 def add_note(session: SessionDep, application_id: int, data: NoteCreate) -> NoteRead:
     return NoteRead.model_validate(applications.add_note(session, application_id, data))
+
+
+# --- Live-Suche ----------------------------------------------------------------
+
+
+@router.get("/search/providers", response_model=list[ProviderInfo], tags=["search"])
+def search_providers(providers: ProvidersDep) -> list[ProviderInfo]:
+    return search.provider_infos(providers)
+
+
+@router.post("/search", response_model=SearchRunRead, tags=["search"])
+async def run_search(
+    session: SessionDep, registry: RegistryDep, providers: ProvidersDep, data: SearchRequest
+) -> SearchRunRead:
+    """Gewählte Portale parallel durchsuchen; Fehler einzelner Portale stehen in ``errors``."""
+    run = await search.run_search(session, registry, providers, data)
+    return SearchRunRead.model_validate(run)
+
+
+@router.get("/search/runs", response_model=list[SearchRunSummary], tags=["search"])
+def list_runs(
+    session: SessionDep, limit: Annotated[int, Query(ge=1, le=100)] = 20
+) -> list[SearchRunSummary]:
+    return [SearchRunSummary.model_validate(r) for r in search.list_runs(session, limit)]
+
+
+@router.get("/search/runs/{run_id}", response_model=SearchRunRead, tags=["search"])
+def get_run(session: SessionDep, run_id: int) -> SearchRunRead:
+    return SearchRunRead.model_validate(search.get_run(session, run_id))
+
+
+@router.get("/search/profiles", response_model=list[SearchProfileRead], tags=["search"])
+def list_profiles(session: SessionDep) -> list[SearchProfileRead]:
+    return [SearchProfileRead.model_validate(p) for p in search.list_profiles(session)]
+
+
+@router.post(
+    "/search/profiles",
+    response_model=SearchProfileRead,
+    status_code=status.HTTP_201_CREATED,
+    tags=["search"],
+)
+def create_profile(session: SessionDep, data: SearchProfileCreate) -> SearchProfileRead:
+    return SearchProfileRead.model_validate(search.create_profile(session, data))
+
+
+@router.delete(
+    "/search/profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["search"]
+)
+def delete_profile(session: SessionDep, profile_id: int) -> None:
+    search.archive_profile(session, profile_id)
+
+
+@router.get("/listings/{listing_id}", response_model=ListingRead, tags=["search"])
+def get_listing(session: SessionDep, listing_id: int) -> ListingRead:
+    return ListingRead.model_validate(search.get_listing(session, listing_id))
+
+
+@router.post("/listings/{listing_id}/save", response_model=PostingDetail, tags=["search"])
+def save_listing(
+    session: SessionDep, registry: RegistryDep, listing_id: int, data: SaveListing
+) -> PostingDetail:
+    """Treffer merken: legt Stelle und Bewerbung an (mehrfacher Aufruf ist unschädlich)."""
+    return PostingDetail.model_validate(search.save_listing(session, registry, listing_id, data))
 
 
 # --- Statistik ---------------------------------------------------------------

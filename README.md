@@ -62,6 +62,9 @@ frontend/      React + TypeScript + Vite, TanStack Query, mobile-first CSS
 | `applications` | Bewerbung zu einer Stelle; `current_status` ist eine denormalisierte Projektion für schnelle Filter |
 | `application_status_events` | **Append-only** Status-Historie, bitemporal: `occurred_at` (fachlich, rückdatierbar) und `recorded_at` (Erfassung) |
 | `notes` | Notizen pro Bewerbung |
+| `listings` | Anzeige je Portal (Rohsicht); `posting_id` NULL = Suchtreffer, sonst verknüpfte Stelle |
+| `search_profiles` | Gespeicherte Suchen |
+| `search_runs` / `search_hits` | Append-only Protokoll jedes Suchlaufs mit Treffern und Rang (Basis für späteres Relevanz-Ranking: gezeigt → gemerkt) |
 
 Alle Tabellen haben `created_at`/`updated_at` in UTC. Löschen ist ein Soft-Delete (`archived_at`).
 Dubletten werden über `(source, external_id)` (partieller Unique-Index) und die normalisierte URL erkannt.
@@ -78,6 +81,19 @@ vorbefüllt, gespeichert wird erst beim Anlegen; die Rohdaten landen mit Zeitste
 Extraktor-Version in `raw_payload`. Interne/lokale Adressen werden nicht geladen (SSRF-Schutz).
 Seiten, die automatischen Abruf blockieren (häufig LinkedIn ohne Login), liefern eine klare
 Fehlermeldung; dann die Felder manuell ausfüllen.
+
+### Suche in Portalen
+
+Der Reiter „Suche in Portalen“ fragt offizielle Such-Schnittstellen parallel ab:
+
+| Quelle | Einrichtung |
+|---|---|
+| Bundesagentur für Arbeit | keine (öffentliche Jobsuche-API) |
+| Adzuna (bündelt viele Portale) | kostenlosen Key auf https://developer.adzuna.com holen, dann in `.env`: `BEWERBUNG_ADZUNA_APP_ID=...` und `BEWERBUNG_ADZUNA_APP_KEY=...` |
+
+Treffer werden als `listings` gespeichert (`first_seen_at`/`last_seen_at`, `content_hash`),
+jeder Lauf mit Rang in `search_runs`/`search_hits`. „Merken“ legt Stelle und Bewerbung an und
+verknüpft das Listing. Suchen lassen sich als Profil speichern.
 
 ### Neue Quelle anbinden
 
@@ -105,5 +121,10 @@ default_registry().register(XingAdapter())
 | PATCH | `/api/applications/{id}` | Priorität, Kontakt, Nachfass-Datum |
 | POST | `/api/applications/{id}/notes` | Notiz hinzufügen |
 | GET | `/api/stats` | Zähler je Status/Quelle, Rücklaufquote |
+| GET | `/api/search/providers` | Verfügbare Such-Quellen |
+| POST | `/api/search` | Live-Suche über Portale |
+| GET | `/api/search/runs` · `/runs/{id}` | Suchhistorie |
+| GET/POST/DELETE | `/api/search/profiles` | Gespeicherte Suchen |
+| POST | `/api/listings/{id}/save` | Treffer merken |
 
 Vollständig und interaktiv unter `/docs`.

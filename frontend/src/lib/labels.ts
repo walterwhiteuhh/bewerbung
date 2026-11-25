@@ -28,6 +28,7 @@ export const SOURCE_LABEL: Record<JobSource, string> = {
   softgarden: "softgarden",
   join: "JOIN",
   workday: "Workday",
+  adzuna: "Adzuna",
   manual: "Manuell",
   other: "Andere",
 };
