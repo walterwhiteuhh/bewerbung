@@ -230,7 +230,7 @@ def test_arbeitsagentur_provider_mapping() -> None:
     assert d.external_id == "10000-1199999999-s"
     assert d.url == "https://www.arbeitsagentur.de/jobsuche/jobdetail/10000-1199999999-S"
     assert d.company_name == "ACME GmbH"
-    assert d.location == "Hamburg, Hamburg"
+    assert d.location == "Hamburg"
     assert d.posted_at is not None and d.posted_at.year == 2026
     assert drafts[1].url == "https://karriere.example.com/job/2"
     assert drafts[1].location is None
@@ -252,11 +252,15 @@ def test_arbeitsagentur_maps_legacy_v4_fields() -> None:
             "refnr": "10000-1-S",
             "titel": "Alt",
             "arbeitgeber": "Old GmbH",
-            "arbeitsort": {"ort": "Kiel"},
+            "arbeitsort": {"ort": "Kiel", "region": "SCHLESWIG-HOLSTEIN"},
         }
     )
     assert d is not None
-    assert (d.external_id, d.company_name, d.location) == ("10000-1-s", "Old GmbH", "Kiel")
+    assert (d.external_id, d.company_name, d.location) == (
+        "10000-1-s",
+        "Old GmbH",
+        "Kiel, Schleswig-Holstein",
+    )
 
 
 def test_arbeitsagentur_error() -> None:
