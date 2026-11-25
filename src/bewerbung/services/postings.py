@@ -135,6 +135,8 @@ def create_posting(
         )
     session.add(posting)
     session.flush()
+    for listing in posting.listings:
+        companies.derive_listing_keys(session, listing)
     if data.tags:
         add_tags(session, posting, data.tags)
     logger.info("Stelle %s angelegt (Quelle %s)", posting.id, source)
@@ -175,6 +177,8 @@ def update_posting(
             companies.enrich_from_posting(
                 posting.company, logo_from_payload(posting.raw_payload), posting.raw_payload
             )
+        for listing in posting.listings:  # Querbezüge folgen der korrigierten Firma
+            listing.company_id = posting.company.id if posting.company else None
     if "url" in changes:
         url = changes.pop("url")
         posting.url = url

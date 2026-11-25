@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import Company, JobPosting
+from bewerbung.db.models import Company, JobPosting, Listing
 from bewerbung.db.types import utcnow
 from bewerbung.domain.errors import DomainError, NotFoundError
+from bewerbung.domain.geo import place_from_payload
 from bewerbung.domain.logos import clean_logo_url
+from bewerbung.domain.matching import company_key, title_key
 from bewerbung.domain.schemas import CompanyRead, CompanyUpdate
 from bewerbung.domain.websites import normalize_website, website_from_payload
 from bewerbung.sources.fetcher import FetchError
@@ -18,15 +19,7 @@ from bewerbung.sources.site_logo import LogoStore, SiteLogoFetcher
 
 logger = logging.getLogger(__name__)
 
-_LEGAL_FORMS = re.compile(r"\b(gmbh|ag|se|kg|ohg|ug|mbh|co|inc|ltd|llc|e\.?v)\b\.?", re.IGNORECASE)
 LOGO_FILES_PATH = "/api/logos/files/{name}"
-
-
-def company_key(name: str) -> str:
-    """Normalisierter Vergleichsschlüssel: ohne Rechtsform, Satzzeichen und Mehrfach-Leerzeichen."""
-    key = _LEGAL_FORMS.sub(" ", name.casefold())
-    key = re.sub(r"[^\w]+", " ", key)
-    return " ".join(key.split()) or name.casefold().strip()
 
 
 def get_or_create_company(session: Session, name: str) -> Company:
@@ -37,6 +30,22 @@ def get_or_create_company(session: Session, name: str) -> Company:
         session.add(company)
         session.flush()
     return company
+
+
+def derive_listing_keys(session: Session, listing: Listing) -> None:
+    """Firma, Titel-Schlüssel und strukturierten Ort eines Listings setzen (idempotent)."""
+    if listing.posting is not None and listing.posting.company_id is not None:
+        listing.company_id = listing.posting.company_id
+    elif listing.company_name and listing.company_name.strip():
+        company = get_or_create_company(session, listing.company_name)
+        enrich_from_posting(company, listing.company_logo_url, listing.raw_payload)
+        listing.company_id = company.id
+    listing.title_key = title_key(listing.title or "")
+    place = place_from_payload(listing.raw_payload, listing.location)
+    listing.city = place.city[:120] if place.city else None
+    listing.postal_code = place.postal_code[:10] if place.postal_code else None
+    listing.region = place.region[:120] if place.region else None
+    listing.lat, listing.lon = place.lat, place.lon
 
 
 def enrich_from_posting(company: Company, logo_url: str | None, raw_payload: Any) -> None:

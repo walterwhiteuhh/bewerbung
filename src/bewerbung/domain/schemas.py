@@ -342,6 +342,7 @@ class SearchHitRead(_Schema):
     rank: int
     is_new: bool
     listing: ListingRead
+    features: JobFeatures | None = None
 
 
 class SearchError(_Schema):
@@ -405,6 +406,9 @@ class ProfileRead(_Schema):
     skills: list[str]
     cv_text: str | None
     signature: str | None
+    home_location: str | None = None
+    home_located: bool = Field(default=False, description="Koordinaten des Wohnorts bekannt")
+    max_distance_km: int | None = None
     updated_at: datetime | None = None
 
 
@@ -420,6 +424,8 @@ class ProfileUpdate(_Schema):
     )
     cv_text: OptStr = Field(default=None, max_length=50_000)
     signature: OptStr = Field(default=None, max_length=1_000)
+    home_location: OptStr = Field(default=None, max_length=255, description="Ort oder PLZ")
+    max_distance_km: int | None = Field(default=None, ge=1, le=1000)
 
 
 GeneratorName = Literal["claude", "openai", "gemini", "template"]
@@ -505,3 +511,67 @@ class DocumentText(_Schema):
 
 class PostingDocumentsUpdate(_Schema):
     document_ids: list[int] = Field(default_factory=list, max_length=50)
+
+
+# --- Zusammenhänge und Merkmale ------------------------------------------------
+
+
+class ListingBrief(_Schema):
+    id: int
+    posting_id: int | None
+    source: JobSource
+    title: str
+    company_name: str | None
+    city: str | None
+    url: str | None
+    last_seen_at: datetime
+
+
+class CompanyActivity(_Schema):
+    company_id: int
+    listings: int = Field(description="Anzeigen dieser Firma in deinen Suchen/Importen")
+    active_listings: int = Field(description="davon in den letzten 14 Tagen gesehen")
+    portals: list[JobSource]
+    saved_postings: int
+    applications: int = Field(description="Bewerbungen mit Status ab 'beworben'")
+    rejections: int
+    last_status: str | None = None
+
+
+class SimilarJob(_Schema):
+    kind: Literal["posting", "listing"]
+    id: int
+    title: str
+    company_name: str | None
+    score: float
+    shared: list[str]
+
+
+class JobFeatures(_Schema):
+    """Abgeleitete Merkmale einer Anzeige; dieselbe Berechnung für UI, Export und Modelle."""
+
+    city: str | None = None
+    region: str | None = None
+    distance_km: float | None = None
+    distance_estimated: bool = Field(
+        default=False, description="Ort ohne eigene Koordinaten: Stadtmitte aus anderen Anzeigen"
+    )
+    within_max_distance: bool | None = None
+    age_days: int | None = Field(default=None, description="Tage seit Veröffentlichung")
+    days_online: int | None = Field(default=None, description="erstes bis letztes Sehen")
+    times_seen: int = 0
+    portals: list[JobSource] = Field(default_factory=list)
+    is_repost: bool = False
+    match_score: float | None = Field(default=None, description="Anteil Skills, die du hast")
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    company: CompanyActivity | None = None
+    similar_saved: SimilarJob | None = None
+
+
+class PostingInsights(_Schema):
+    features: JobFeatures
+    other_portals: list[ListingBrief]
+    same_company_postings: list[SimilarJob]
+    same_company_listings: list[ListingBrief]
+    similar: list[SimilarJob]

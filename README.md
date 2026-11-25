@@ -1,6 +1,7 @@
-# Bewerbungsmanager
+# Anheuern
 
-Stellenanzeigen und Bewerbungen aus mehreren Quellen (LinkedIn, Stepstone, Karriereseiten) an einem Ort organisieren.
+_Kurs auf den nächsten Job._ Stellenanzeigen aus mehreren Portalen finden, Bewerbungen steuern und Anschreiben erstellen, alles an einem Ort.
+(Python-Paket und Ordner heißen weiterhin `bewerbung`.)
 Iteration 1: manuelle Erfassung mit automatischer Quellen-Erkennung, Status-Historie, Notizen, Suche und Kennzahlen.
 Live-Importer docken später an die Quellen-Abstraktion an.
 
@@ -159,6 +160,27 @@ werden wie beim Import abgelehnt, SVG wird mit `Content-Security-Policy: sandbox
 Website, Branche und Firmensitz gelten für alle Stellen der Firma (`PATCH /api/companies/{id}`,
 `POST /api/companies/{id}/logo`). Beim Import wird `hiringOrganization.sameAs`/`url` als Website
 übernommen, sofern es keine Portal-Adresse ist.
+
+### Zusammenhänge und Merkmale
+
+Jede Anzeige wird beim Speichern einer Firma (`listings.company_id`, gleicher Schlüssel wie
+`companies.name_key`) und einem Titel-Schlüssel ohne Gender-Zusätze (`title_key`) zugeordnet;
+Ort, PLZ und Koordinaten kommen aus den Rohdaten (Arbeitsagentur-Lokationen, JSON-LD `geo`).
+Daraus berechnet `services/insights.py` zur Laufzeit:
+
+| Merkmal | Herleitung |
+|---|---|
+| Entfernung | Luftlinie Wohnort ↔ Anzeige; ohne Koordinaten Median-Stadtmitte aus anderen Anzeigen („ca.“) |
+| Wohnort | PLZ/Ort aus „Mein Profil“, Koordinaten aus bekannten Anzeigen (kein Geocoding-Dienst) |
+| Passung | Anteil der Skills der Anzeige, die in Profil-Skills oder Lebenslauf vorkommen |
+| Portale / neu ausgeschrieben | gleiche Firma + gleicher Titel-Schlüssel auf mehreren Portalen bzw. unter neuer ID |
+| Firmenaktivität | Anzeigen der Firma (aktiv = 14 Tage gesehen), eigene Bewerbungen und Absagen dort |
+| Ähnlichkeit | gewichtete Jaccard-Ähnlichkeit von Titel-Wörtern (60 %) und Skills (40 %) |
+
+Suchtreffer tragen die Merkmale (`features`) und lassen sich nach Passung, Entfernung und Alter
+sortieren; jede Stelle zeigt „Zusammenhänge“ (`GET /api/postings/{id}/insights`).
+`GET /api/insights/listings.csv` exportiert alle Anzeigen mit denselben Merkmalen und dem
+Bewerbungsstatus als Label, als Ausgangspunkt für ein späteres Ranking-Modell.
 
 ### Neue Quelle anbinden
 

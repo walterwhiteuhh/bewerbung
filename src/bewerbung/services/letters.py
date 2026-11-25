@@ -78,6 +78,8 @@ def get_profile(session: Session) -> ApplicantProfile:
 
 def update_profile(session: Session, data: ProfileUpdate) -> ApplicantProfile:
     profile = get_profile(session)
+    if data.home_location != profile.home_location:
+        profile.home_lat = profile.home_lon = None  # neu auflösen (services.insights)
     for key, value in data.model_dump().items():
         setattr(profile, key, value)
     session.flush()
@@ -331,3 +333,8 @@ def to_read(letter: CoverLetter) -> CoverLetterRead:
         created_at=letter.created_at,
         updated_at=letter.updated_at,
     )
+
+
+def cv_text_for(session: Session, profile: ApplicantProfile) -> str | None:
+    """Öffentlicher Zugang zum Lebenslauf-Text (Profil oder Haupt-Lebenslauf)."""
+    return _cv_text(session, profile)
