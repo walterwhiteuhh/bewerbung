@@ -14,10 +14,10 @@ from bewerbung.db.models import (
     Company,
     JobPosting,
     Listing,
-    PostingTag,
+    TagLink,
 )
 from bewerbung.db.types import utcnow
-from bewerbung.domain.enums import ApplicationStatus, JobSource
+from bewerbung.domain.enums import ApplicationStatus, JobSource, TagEntity
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
 from bewerbung.domain.geo import place_from_payload
 from bewerbung.domain.logos import logo_from_payload
@@ -277,9 +277,10 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
     for ids in expand_filter_ids(session, keys) if keys else []:
         where.append(
             exists().where(
-                PostingTag.posting_id == JobPosting.id,
-                PostingTag.removed_at.is_(None),
-                PostingTag.tag_id.in_(ids or {-1}),
+                TagLink.entity_type == TagEntity.POSTING,
+                TagLink.entity_id == JobPosting.id,
+                TagLink.removed_at.is_(None),
+                TagLink.tag_id.in_(ids or {-1}),
             )
         )
     if flt.location:

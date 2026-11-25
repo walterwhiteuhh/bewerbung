@@ -11,30 +11,31 @@ from collections import defaultdict
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from bewerbung.db.models import (
     Company,
     Document,
     JobPosting,
-    PostingTag,
     SearchProfile,
     Tag,
     TagLink,
     TagRelation,
 )
 from bewerbung.db.types import utcnow
+from bewerbung.domain.enums import TagEntity
 from bewerbung.domain.errors import DomainError, NotFoundError
 from bewerbung.domain.schemas import TagCount
 from bewerbung.domain.tags import tag_key
-from bewerbung.services.tags import get_or_create_tags
+from bewerbung.services.tags import link_tags
 
 logger = logging.getLogger(__name__)
 
 ENTITY_MODELS: dict[str, Any] = {
-    "company": Company,
-    "document": Document,
-    "search_profile": SearchProfile,
+    TagEntity.POSTING: JobPosting,
+    TagEntity.COMPANY: Company,
+    TagEntity.DOCUMENT: Document,
+    TagEntity.SEARCH_PROFILE: SearchProfile,
 }
 KINDS = ("implies", "alias", "related")
 
@@ -107,10 +108,14 @@ def list_tags(session: Session) -> list[TagCount]:
     zusätzlich mit der Zahl aller darunterliegenden Stellen und sind als ``derived`` markiert.
     """
     pairs = session.execute(
-        select(Tag.key, Tag.name, PostingTag.posting_id)
-        .join(PostingTag, PostingTag.tag_id == Tag.id)
-        .join(JobPosting, JobPosting.id == PostingTag.posting_id)
-        .where(PostingTag.removed_at.is_(None), JobPosting.archived_at.is_(None))
+        select(Tag.key, Tag.name, TagLink.entity_id)
+        .join(TagLink, TagLink.tag_id == Tag.id)
+        .join(JobPosting, JobPosting.id == TagLink.entity_id)
+        .where(
+            TagLink.entity_type == TagEntity.POSTING,
+            TagLink.removed_at.is_(None),
+            JobPosting.archived_at.is_(None),
+        )
     ).all()
     if not pairs:
         return []
@@ -178,42 +183,8 @@ def set_entity_tags(
 ) -> list[str]:
     """Setzt genau diese Hashtags; entfernte behalten ``removed_at`` für die Historie."""
     _check_entity(session, entity_type, entity_id)
-    tags = get_or_create_tags(session, names)
-    wanted = {t.id for t in tags}
-    now = utcnow()
-    active = {
-        link.tag_id: link
-        for link in session.scalars(
-            select(TagLink).where(
-                TagLink.entity_type == entity_type,
-                TagLink.entity_id == entity_id,
-                TagLink.removed_at.is_(None),
-            )
-        )
-    }
-    for tag_id, link in active.items():
-        if tag_id not in wanted:
-            link.removed_at = now
-    for tag in tags:
-        if tag.id not in active:
-            session.add(
-                TagLink(entity_type=entity_type, entity_id=entity_id, tag_id=tag.id, origin=origin)
-            )
-    session.flush()
+    tags = link_tags(session, entity_type, entity_id, names, origin=origin, replace=True)
     return sorted((t.name for t in tags), key=str.casefold)
-
-
-def drop_entity_tags(session: Session, entity_type: str, entity_id: int) -> None:
-    """Beim endgültigen Löschen eines Objekts die Zuordnungen beenden."""
-    now = utcnow()
-    for link in session.scalars(
-        select(TagLink).where(
-            TagLink.entity_type == entity_type,
-            TagLink.entity_id == entity_id,
-            TagLink.removed_at.is_(None),
-        )
-    ):
-        link.removed_at = now
 
 
 # --- Verknüpfungen pflegen ---------------------------------------------------------------
@@ -276,17 +247,21 @@ def related_tags(session: Session, key: str, limit: int = 8) -> list[str]:
     own = graph.expand(key)
     hinted = (graph.related.get(key, set()) | graph.parents.get(key, set())) - own
     own_ids = {i for (i,) in session.execute(select(Tag.id).where(Tag.key.in_(own)))}
-    other = PostingTag.__table__.alias("o")
+    other = aliased(TagLink)
     co = session.execute(
-        select(other.c.tag_id, func.count())
-        .join(PostingTag, PostingTag.posting_id == other.c.posting_id)
-        .where(
-            PostingTag.tag_id.in_(own_ids or {-1}),
-            PostingTag.removed_at.is_(None),
-            other.c.removed_at.is_(None),
-            other.c.tag_id.not_in(own_ids or {-1}),
+        select(other.tag_id, func.count())
+        .join(
+            TagLink,
+            (TagLink.entity_type == other.entity_type) & (TagLink.entity_id == other.entity_id),
         )
-        .group_by(other.c.tag_id)
+        .where(
+            TagLink.entity_type == TagEntity.POSTING,
+            TagLink.tag_id.in_(own_ids or {-1}),
+            TagLink.removed_at.is_(None),
+            other.removed_at.is_(None),
+            other.tag_id.not_in(own_ids or {-1}),
+        )
+        .group_by(other.tag_id)
         .order_by(func.count().desc())
         .limit(limit)
     ).all()
@@ -310,10 +285,13 @@ def overview(session: Session, key: str) -> dict[str, Any]:
         raise NotFoundError("Hashtag", key)
     postings = session.execute(
         select(JobPosting.id, JobPosting.title)
-        .join(PostingTag, PostingTag.posting_id == JobPosting.id)
+        .join(
+            TagLink,
+            (TagLink.entity_id == JobPosting.id) & (TagLink.entity_type == TagEntity.POSTING),
+        )
         .where(
-            PostingTag.tag_id.in_(ids or {-1}),
-            PostingTag.removed_at.is_(None),
+            TagLink.tag_id.in_(ids or {-1}),
+            TagLink.removed_at.is_(None),
             JobPosting.archived_at.is_(None),
         )
         .distinct()
@@ -321,9 +299,9 @@ def overview(session: Session, key: str) -> dict[str, Any]:
     ).all()
     linked: dict[str, list[dict[str, Any]]] = {}
     for etype, model, label in (
-        ("company", Company, Company.name),
-        ("document", Document, Document.title),
-        ("search_profile", SearchProfile, SearchProfile.name),
+        (TagEntity.COMPANY, Company, Company.name),
+        (TagEntity.DOCUMENT, Document, Document.title),
+        (TagEntity.SEARCH_PROFILE, SearchProfile, SearchProfile.name),
     ):
         rows = session.execute(
             select(model.id, label)
@@ -331,7 +309,7 @@ def overview(session: Session, key: str) -> dict[str, Any]:
             .where(TagLink.tag_id.in_(ids or {-1}), TagLink.removed_at.is_(None))
             .distinct()
         ).all()
-        linked[etype] = [{"id": i, "label": n} for i, n in rows]
+        linked[etype.value] = [{"id": i, "label": n} for i, n in rows]
     # Firmen auch über ihre Stellen: wer Stellen mit dem Tag hat, gehört dazu.
     via_postings = session.execute(
         select(Company.id, Company.name)

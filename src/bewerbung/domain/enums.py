@@ -70,6 +70,15 @@ _FUNNEL: dict[ApplicationStatus, int] = {
 }
 
 
+class TagEntity(StrEnum):
+    """Objekttypen, an denen Hashtags hängen (``tag_links.entity_type``)."""
+
+    POSTING = "posting"
+    COMPANY = "company"
+    DOCUMENT = "document"
+    SEARCH_PROFILE = "search_profile"
+
+
 class OutcomeReason(StrEnum):
     """Strukturierter Grund für einen Endzustand (Label für spätere Modelle)."""
 

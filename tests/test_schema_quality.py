@@ -240,3 +240,44 @@ def test_migration_backfills_existing_data_and_roundtrips(old_db: tuple[str, obj
     command.downgrade(cfg, "0013")  # type: ignore[arg-type]
     command.upgrade(cfg, "head")  # type: ignore[arg-type]
     engine.dispose()
+
+
+def test_posting_tags_are_moved_into_tag_links_and_back(tmp_path: Path) -> None:
+    url = f"sqlite:///{(tmp_path / 'u.db').as_posix()}"
+    cfg = alembic_config(url)
+    command.upgrade(cfg, "0014")
+    engine = create_engine(url)
+    ts = "2026-11-01 10:00:00.000000"
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO job_postings (id, title, remote_type, salary_currency, source, created_at, updated_at) "
+                f"VALUES (1, 'A', 'unknown', 'EUR', 'manual', '{ts}', '{ts}')"
+            )
+        )
+        conn.execute(
+            text(
+                f"INSERT INTO tags (id, name, key, created_at, updated_at) VALUES (1, 'Python', 'python', '{ts}', '{ts}')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO posting_tags (posting_id, tag_id, origin, added_at, removed_at) VALUES "
+                f"(1, 1, 'manual', '{ts}', '2026-11-02 10:00:00.000000'), (1, 1, 'note', '{ts}', NULL)"
+            )
+        )
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT entity_type, entity_id, origin, removed_at IS NULL FROM tag_links ORDER BY id"
+            )
+        ).all()
+        assert [tuple(r) for r in rows] == [("posting", 1, "manual", 0), ("posting", 1, "note", 1)]
+        assert conn.execute(text("SELECT COUNT(*) FROM v_orphan_tag_links")).scalar() == 0
+    command.downgrade(cfg, "0014")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT COUNT(*) FROM posting_tags")).scalar() == 2
+        assert conn.execute(text("SELECT COUNT(*) FROM tag_links")).scalar() == 0
+    command.upgrade(cfg, "head")
+    engine.dispose()
