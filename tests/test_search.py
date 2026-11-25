@@ -11,7 +11,7 @@ from bewerbung.config import Settings
 from bewerbung.domain.enums import JobSource, RemoteType
 from bewerbung.main import create_app
 from bewerbung.search.adzuna import AdzunaProvider
-from bewerbung.search.arbeitsagentur import ArbeitsagenturProvider
+from bewerbung.search.arbeitsagentur import ArbeitsagenturProvider, to_draft
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
 
 
@@ -195,6 +195,7 @@ def test_extended_posting_filters(client: TestClient, make_posting) -> None:
 
 def test_arbeitsagentur_provider_mapping() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/pc/v6/jobs")
         assert request.headers["X-API-Key"] == "jobboerse-jobsuche"
         assert request.url.params["was"] == "python"
         assert request.url.params["wo"] == "Hamburg"
@@ -202,20 +203,20 @@ def test_arbeitsagentur_provider_mapping() -> None:
         return httpx.Response(
             200,
             json={
-                "stellenangebote": [
+                "ergebnisliste": [
                     {
-                        "refnr": "10000-1199999999-S",
-                        "titel": "Python Entwickler (m/w/d)",
-                        "beruf": "Softwareentwickler/in",
-                        "arbeitgeber": "ACME GmbH",
-                        "arbeitsort": {
-                            "ort": "Hamburg",
-                            "region": "Hamburg",
-                            "land": "Deutschland",
-                        },
-                        "aktuelleVeroeffentlichungsdatum": "2026-11-20",
+                        "referenznummer": "10000-1199999999-S",
+                        "stellenangebotsTitel": "Python Entwickler (m/w/d)",
+                        "firma": "ACME GmbH",
+                        "stellenlokationen": [{"adresse": {"ort": "Hamburg", "region": "Hamburg"}}],
+                        "datumErsteVeroeffentlichung": "2026-11-20",
                     },
-                    {"titel": "ohne refnr"},
+                    {
+                        "referenznummer": "10000-2",
+                        "stellenangebotsTitel": "Data Engineer",
+                        "externeURL": "https://karriere.example.com/job/2",
+                    },
+                    {"stellenangebotsTitel": "ohne Referenznummer"},
                 ]
             },
         )
@@ -224,13 +225,38 @@ def test_arbeitsagentur_provider_mapping() -> None:
     drafts = asyncio.run(
         provider.search(SearchQuery(query="python", location="Hamburg", radius_km=30))
     )
-    assert len(drafts) == 1
+    assert len(drafts) == 2
     d = drafts[0]
     assert d.external_id == "10000-1199999999-s"
     assert d.url == "https://www.arbeitsagentur.de/jobsuche/jobdetail/10000-1199999999-S"
     assert d.company_name == "ACME GmbH"
     assert d.location == "Hamburg, Hamburg"
     assert d.posted_at is not None and d.posted_at.year == 2026
+    assert drafts[1].url == "https://karriere.example.com/job/2"
+    assert drafts[1].location is None
+
+
+def test_arbeitsagentur_no_hits_and_homeoffice_filter() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["homeoffice"] == "prozentual_0"
+        assert "arbeitszeit" not in request.url.params
+        return httpx.Response(200, json={"maxErgebnisse": 0})  # keine "ergebnisliste"
+
+    provider = ArbeitsagenturProvider("k", transport=httpx.MockTransport(handler))
+    assert asyncio.run(provider.search(SearchQuery(query="x", remote_only=True))) == []
+
+
+def test_arbeitsagentur_maps_legacy_v4_fields() -> None:
+    d = to_draft(
+        {
+            "refnr": "10000-1-S",
+            "titel": "Alt",
+            "arbeitgeber": "Old GmbH",
+            "arbeitsort": {"ort": "Kiel"},
+        }
+    )
+    assert d is not None
+    assert (d.external_id, d.company_name, d.location) == ("10000-1-s", "Old GmbH", "Kiel")
 
 
 def test_arbeitsagentur_error() -> None:
