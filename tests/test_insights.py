@@ -148,10 +148,16 @@ def test_posting_insights_and_export(client_with_hits: TestClient) -> None:
     feats = c.get(f"/api/listings/{by_ext['z1']}/features").json()
     assert feats["similar_saved"]["id"] == posting["id"]
 
+    c.post(
+        f"/api/companies/{posting['company']['id']}/ratings",
+        json={"source": "kununu", "value": 4.2, "review_count": 50},
+    )
     resp = c.get("/api/insights/listings.csv")
     assert resp.status_code == 200
     rows = list(csv.DictReader(io.StringIO(resp.text.lstrip("﻿")), delimiter=";"))
     assert len(rows) == 3
     saved = next(r for r in rows if r["posting_id"])
     assert saved["label_status"] == "saved"
+    assert saved["employer_rating"] == "4.2" and saved["employer_rating_sources"] == "kununu"
+    assert saved["employer_rating_observed_at"]
     assert {"distance_km", "match_score", "portal_count", "company_listings"} <= set(rows[0])

@@ -193,6 +193,15 @@ Instagram, Facebook, YouTube, X, TikTok und GitHub werden aus JSON-LD `sameAs` d
 beim Laden von der Firmen-Website aus deren Links übernommen (Teilen-Links und einzelne Beiträge
 zählen nicht) und lassen sich im Firmenbereich von Hand pflegen.
 
+**Arbeitgeber-Bewertung** (`company_ratings`, append-only; `domain/ratings.py`): Je Portal
+(kununu, Glassdoor, Indeed, Google, andere) werden Wert, Skala und Anzahl der Bewertungen im
+Firmenbereich erfasst; die Portale sperren automatische Abrufe per Bot-Prüfung, daher von Hand
+mit Direktlink zur Suche. Alle Werte werden auf 5 Sterne umgerechnet; der Gesamtwert ist das
+arithmetische Mittel der Portale mit mindestens 10 Bewertungen (ungewichtet, damit kein Portal
+dominiert). Er erscheint in Stelle, Info-Karte, als Merkmal und im CSV-Export
+(`employer_rating*`; `employer_rating_observed_at` erlaubt, spätere Werte beim Training
+auszuschließen).
+
 ### Neue Quelle anbinden
 
 ```python

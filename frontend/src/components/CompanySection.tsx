@@ -3,6 +3,7 @@ import { useMutate } from "../api/hooks";
 import type { Company, CompanyUpdate } from "../api/types";
 import { CompanyLogo } from "./CompanyLogo";
 import { SocialLinks } from "./SocialLinks";
+import { RatingEditor } from "./EmployerRating";
 import { useToast } from "./Toast";
 
 const LOGO_SOURCE_LABEL: Record<string, string> = {
@@ -112,6 +113,7 @@ export function CompanySection({ company }: { company: Company }) {
           />
         </label>
       </div>
+      <RatingEditor company={company} />
       <p className="hint">Gilt für alle Stellen dieser Firma. Profile werden auch aus der Anzeige und von der Website übernommen.</p>
     </section>
   );
