@@ -338,6 +338,10 @@ class Stats(_Schema):
     response_rate: float | None = Field(
         description="Anteil beworbener Stellen mit Rückmeldung (über 'applied' hinaus)"
     )
+    activity_7d: int = Field(
+        default=0, description="Statuswechsel der letzten 7 Tage (nach occurred_at)"
+    )
+    last_activity_at: datetime | None = None
 
 
 # --- Live-Suche ----------------------------------------------------------------

@@ -1,9 +1,10 @@
 import { useState } from "react";
 
-import { usePostings } from "./api/hooks";
+import { usePostings, useStats } from "./api/hooks";
 import { SOURCES, type ApplicationStatus, type JobSource, type PostingDetail as Posting, type PostingFilter, type SortField } from "./api/types";
 import { Dialog } from "./components/Dialog";
 import { ShipScene } from "./components/ShipScene";
+import { voyageFrom } from "./lib/voyage";
 import { EMPTY_EXTRA, FilterPanel, activeFilterCount } from "./components/FilterPanel";
 import { PostingDetail } from "./components/PostingDetail";
 import { PostingForm } from "./components/PostingForm";
@@ -58,6 +59,7 @@ export function App() {
     order,
   };
   const { data, isLoading, isFetching } = usePostings(filter);
+  const { data: stats } = useStats();
   const filtered = Boolean(filter.q || status.length || source || activeTags.length || activeFilterCount(extra));
   const toggleTag = (t: string) =>
     setTags((cur) => (cur.some((x) => sameTag(x, t)) ? cur.filter((x) => !sameTag(x, t)) : [...cur, t]));
@@ -208,7 +210,7 @@ export function App() {
             />
           ) : (
             <div className="empty empty--detail">
-              <ShipScene />
+              <ShipScene voyage={stats ? voyageFrom(stats) : undefined} />
               <p className="empty__title">Noch nichts an Deck</p>
               <p>Wähle links eine Stelle, um Status, Notizen und Verlauf zu sehen.</p>
             </div>

@@ -63,7 +63,18 @@ bewusst überlange Titel und Firmennamen und braucht kein Netzwerk. Lange Wörte
 
 Leere Ansichten zeigen ein kleines SVG-Segelschiff auf bewegter See (`ShipScene.tsx`): reine
 CSS-Transforms, keine Bilder, kein JavaScript pro Frame, unter 2 KB. Bei „Bewegung reduzieren“
-im System steht es still.
+im System steht es still. Die Szene folgt der Tageszeit (Morgenrot, Tag, Abendrot, Nacht) und zeigt in
+der leeren Detailspalte die Kennzahlen aus `/api/stats` (`lib/voyage.ts`):
+
+| Bild | Kennzahl |
+|---|---|
+| Seegang und Wind (Flaute bis steife Brise) | Statuswechsel der letzten 7 Tage (`activity_7d`) |
+| Wimpel an der Leine | laufende Bewerbungen (max. 8 gezeichnet) |
+| Bojen | Bewerbungen im Status Interview (max. 5) |
+| Leuchtfeuer, auch tagsüber | mindestens ein Angebot |
+| Insel mit Palme | mindestens eine Zusage |
+
+Ein Logbuch unter der Szene nennt die Zahlen, damit nichts geraten werden muss.
 
 ## Architektur
 

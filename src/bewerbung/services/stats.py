@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from bewerbung.db.models import Application, ApplicationStatusEvent, JobPosting
+from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus
 from bewerbung.domain.schemas import CountBucket, Stats
 
@@ -66,10 +69,24 @@ def compute_stats(session: Session) -> Stats:
         or 0
     )
 
+    # Aktivität fürs "Wetter" der Startseite: wie viel hat sich zuletzt bewegt?
+    events = (
+        select(
+            func.count().filter(ApplicationStatusEvent.occurred_at >= utcnow() - timedelta(days=7)),
+            func.max(ApplicationStatusEvent.occurred_at),
+        )
+        .join(Application, Application.id == ApplicationStatusEvent.application_id)
+        .join(JobPosting, JobPosting.id == Application.posting_id)
+        .where(active_postings)
+    )
+    activity_7d, last_activity_at = session.execute(events).one()
+
     return Stats(
         total=total,
         active=active,
         by_status=by_status,
         by_source=by_source,
         response_rate=round(responded / applied, 3) if applied else None,
+        activity_7d=activity_7d or 0,
+        last_activity_at=last_activity_at,
     )
