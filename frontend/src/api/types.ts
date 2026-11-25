@@ -261,6 +261,14 @@ export interface CountBucket {
   count: number;
 }
 
+export interface SalaryStat {
+  currency: string;
+  count: number;
+  min: number;
+  median: number;
+  max: number;
+}
+
 export interface Stats {
   total: number;
   active: number;
@@ -269,6 +277,8 @@ export interface Stats {
   response_rate: number | null;
   activity_7d: number;
   last_activity_at: string | null;
+  by_reason: CountBucket[];
+  offer_salaries: SalaryStat[];
 }
 
 export interface PostingFilter {

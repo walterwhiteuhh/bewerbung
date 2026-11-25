@@ -1,6 +1,7 @@
 import { useStats } from "../api/hooks";
 import { STATUSES, type ApplicationStatus } from "../api/types";
 import { STATUS_LABEL } from "../lib/labels";
+import { outcomeSummary } from "../lib/outcome";
 
 interface Props {
   selected: ApplicationStatus[];
@@ -15,6 +16,7 @@ export function StatsBar({ selected, onToggle }: Props) {
   const { data } = useStats();
   const count = (s: string) => data?.by_status.find((b) => b.key === s)?.count ?? 0;
   const filled = STATUSES.filter((s) => count(s) > 0);
+  const outcomes = outcomeSummary(data);
   const rate = data?.response_rate != null ? `${Math.round(data.response_rate * 100)} %` : "–";
 
   return (
@@ -65,6 +67,21 @@ export function StatsBar({ selected, onToggle }: Props) {
           </button>
         ))}
       </div>
+
+      {(outcomes.reasons.length > 0 || outcomes.salary) && (
+        <div className="outcomes" aria-label="Auswertung der Ergebnisse">
+          {outcomes.salary && <p className="outcomes__salary">Angebote: {outcomes.salary}</p>}
+          {outcomes.reasons.length > 0 && (
+            <ul className="outcomes__reasons" aria-label="Gründe für Absagen und Rückzüge">
+              {outcomes.reasons.map((r) => (
+                <li key={r.key}>
+                  {r.label} <strong>{r.count}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }

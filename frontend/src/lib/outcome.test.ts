@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { asksSalary, parseSalary, reasonsFor } from "./outcome";
+import type { Stats } from "../api/types";
+import { asksSalary, outcomeSummary, parseSalary, reasonsFor } from "./outcome";
 
 describe("outcome", () => {
   it("bietet Gründe nur bei Absage und Rückzug", () => {
@@ -23,5 +24,16 @@ describe("outcome", () => {
     expect(parseSalary("abc")).toBeUndefined();
     expect(parseSalary("0")).toBeUndefined();
     expect(parseSalary("99999999")).toBeUndefined();
+  });
+
+  it("fasst Gründe und Gehälter zusammen", () => {
+    const stats = {
+      by_reason: [{ key: "salary_mismatch", count: 2 }, { key: "unbekannt", count: 1 }],
+      offer_salaries: [{ currency: "EUR", count: 2, min: 60000, median: 70000, max: 80000 }],
+    } as Stats;
+    const s = outcomeSummary(stats);
+    expect(s.reasons.map((r) => r.label)).toEqual(["Gehalt passt nicht", "unbekannt"]);
+    expect(s.salary).toMatch(/Ø 70\.000\s€ \(60\.000\s€ – 80\.000\s€\), 2 Angebote/);
+    expect(outcomeSummary(undefined)).toEqual({ reasons: [], salary: null });
   });
 });

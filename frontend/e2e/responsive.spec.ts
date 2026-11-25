@@ -340,6 +340,11 @@ test.describe("Statuswechsel mit Grund und Gehalt", () => {
       await page.getByLabel("Grund").selectOption({ label: "Gehalt passt nicht" });
       await page.getByRole("button", { name: "Übernehmen" }).click();
       await expect(page.locator(".timeline__detail", { hasText: "Gehalt passt nicht" })).toBeVisible();
+
+      // Die Pipeline fasst Gründe und Gehälter zusammen
+      await page.goto("/#/");
+      await expect(page.locator(".outcomes__reasons li", { hasText: "Gehalt passt nicht" })).toBeVisible();
+      await expect(page.locator(".outcomes__salary")).toContainText("Angebot");
     } finally {
       await request.post(`/api/postings/${posting.id}/archive`);
     }

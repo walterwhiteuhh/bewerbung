@@ -13,6 +13,8 @@ function stats(over: Partial<Stats> & { status?: Record<string, number> } = {}):
     response_rate: null,
     activity_7d: 0,
     last_activity_at: null,
+    by_reason: [],
+    offer_salaries: [],
     ...rest,
   };
 }

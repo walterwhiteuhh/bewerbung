@@ -386,6 +386,16 @@ class CountBucket(_Schema):
     count: int
 
 
+class SalaryStat(_Schema):
+    """Angebotsgehälter (Jahresgehalt) je Währung; je Bewerbung zählt das zuletzt genannte."""
+
+    currency: str
+    count: int
+    min: int
+    median: int
+    max: int
+
+
 class Stats(_Schema):
     total: int
     active: int
@@ -398,6 +408,13 @@ class Stats(_Schema):
         default=0, description="Statuswechsel der letzten 7 Tage (nach occurred_at)"
     )
     last_activity_at: datetime | None = None
+    by_reason: list[CountBucket] = Field(
+        default_factory=list,
+        description="Gründe von Absagen/Rückzügen; je Bewerbung zählt der zuletzt genannte",
+    )
+    offer_salaries: list[SalaryStat] = Field(
+        default_factory=list, description="Gehälter genannter Angebote, größte Gruppe zuerst"
+    )
 
 
 # --- Live-Suche ----------------------------------------------------------------

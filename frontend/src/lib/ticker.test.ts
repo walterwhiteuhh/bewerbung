@@ -14,6 +14,8 @@ const stats = (over: Partial<Stats> = {}): Stats => ({
   response_rate: null,
   activity_7d: 4,
   last_activity_at: null,
+  by_reason: [],
+  offer_salaries: [],
   ...over,
 });
 
