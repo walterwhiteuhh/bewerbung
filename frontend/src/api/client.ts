@@ -14,6 +14,7 @@ import type {
   SourceDetection,
   Stats,
   ApplicationStatus,
+  TagCount,
 } from "./types";
 
 export class ApiError extends Error {
@@ -58,6 +59,7 @@ export const api = {
     f.status.forEach((s) => params.append("status", s));
     f.source.forEach((s) => params.append("source", s));
     f.remote.forEach((r) => params.append("remote", r));
+    f.tag.forEach((t) => params.append("tag", t));
     if (f.location.trim()) params.set("location", f.location.trim());
     if (f.minSalary !== null) params.set("min_salary", String(f.minSalary));
     if (f.followUpDue) params.set("follow_up_due", "true");
@@ -82,6 +84,7 @@ export const api = {
     request<Application>(`/applications/${appId}`, json("PATCH", data)),
   addNote: (appId: number, body: string) => request<Note>(`/applications/${appId}/notes`, json("POST", { body })),
   stats: () => request<Stats>("/stats"),
+  tags: () => request<TagCount[]>("/tags"),
   providers: () => request<ProviderInfo[]>("/search/providers"),
   search: (p: SearchParams) => request<SearchRun>("/search", json("POST", p)),
   searchRuns: () => request<SearchRunSummary[]>("/search/runs?limit=8"),

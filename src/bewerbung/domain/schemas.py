@@ -15,6 +15,7 @@ from pydantic import (
 )
 
 from bewerbung.domain.enums import ApplicationStatus, JobSource, RemoteType
+from bewerbung.domain.tags import unique_tags
 
 
 def _strip_or_none(value: str | None) -> str | None:
@@ -32,6 +33,8 @@ def _to_utc(value: datetime) -> datetime:
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(_to_utc)]
 OptStr = Annotated[str | None, AfterValidator(_strip_or_none)]
 Priority = Annotated[int, Field(ge=1, le=5)]
+# Hashtags: bereinigt ("#Python " -> "Python"), Dubletten unabhängig von Groß-/Kleinschreibung weg.
+TagList = Annotated[list[str], Field(max_length=30), AfterValidator(unique_tags)]
 
 
 class _Schema(BaseModel):
@@ -111,6 +114,7 @@ class PostingCreate(_PostingFields):
 
     initial_status: ApplicationStatus = ApplicationStatus.SAVED
     priority: Priority = 3
+    tags: TagList = Field(default_factory=list)
 
 
 class PostingUpdate(_Schema):
@@ -127,6 +131,7 @@ class PostingUpdate(_Schema):
     description: OptStr = None
     url: OptStr = Field(default=None, max_length=2048)
     posted_at: UtcDatetime | None = None
+    tags: TagList | None = Field(default=None, description="Ersetzt alle Hashtags der Stelle")
 
 
 class CompanyRead(_Schema):
@@ -157,6 +162,7 @@ class PostingListItem(_Schema):
     created_at: datetime
     updated_at: datetime
     application: ApplicationSummary | None
+    tags: list[str] = Field(default_factory=list)
 
 
 class PostingPage(_Schema):
@@ -234,6 +240,9 @@ class PostingFilter(_Schema):
     status: list[ApplicationStatus] = Field(default_factory=list)
     source: list[JobSource] = Field(default_factory=list)
     remote: list[RemoteType] = Field(default_factory=list)
+    tag: TagList = Field(
+        default_factory=list, description="Nur Stellen mit allen genannten Hashtags"
+    )
     location: OptStr = None
     min_salary: int | None = Field(default=None, ge=0)
     follow_up_due: bool = False
@@ -242,6 +251,11 @@ class PostingFilter(_Schema):
     order: Literal["asc", "desc"] = "desc"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+
+class TagCount(_Schema):
+    name: str
+    count: int
 
 
 class CountBucket(_Schema):
@@ -347,3 +361,4 @@ class SearchProfileRead(SearchProfileCreate):
 class SaveListing(_Schema):
     initial_status: ApplicationStatus = ApplicationStatus.SAVED
     priority: Priority = 3
+    tags: TagList = Field(default_factory=list)

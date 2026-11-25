@@ -7,6 +7,7 @@ export const keys = {
   postings: (f: PostingFilter) => ["postings", f] as const,
   posting: (id: number) => ["posting", id] as const,
   stats: ["stats"] as const,
+  tags: ["tags"] as const,
 };
 
 export const usePostings = (f: PostingFilter) =>
@@ -17,6 +18,8 @@ export const usePosting = (id: number | null) =>
 
 export const useStats = () => useQuery({ queryKey: keys.stats, queryFn: api.stats });
 
+export const useTags = () => useQuery({ queryKey: keys.tags, queryFn: api.tags, staleTime: 30_000 });
+
 /** Jede Änderung macht Listen, Detail und Kennzahlen ungültig: einfach und immer konsistent. */
 export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>) {
   const qc = useQueryClient();
@@ -26,6 +29,7 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
       void qc.invalidateQueries({ queryKey: ["postings"] });
       void qc.invalidateQueries({ queryKey: ["posting"] });
       void qc.invalidateQueries({ queryKey: keys.stats });
+      void qc.invalidateQueries({ queryKey: keys.tags });
     },
   });
 }

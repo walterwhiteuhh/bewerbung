@@ -9,7 +9,9 @@ import { PostingForm } from "./components/PostingForm";
 import { PostingList } from "./components/PostingList";
 import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
+import { TagFilterBar } from "./components/TagInput";
 import { SOURCE_LABEL } from "./lib/labels";
+import { addUnique, sameTag, splitHashtags } from "./lib/tags";
 import { useDebounced, useMediaQuery, useSelectedId, useView } from "./lib/useHashRoute";
 
 const SORTS: { value: `${SortField}:${"asc" | "desc"}`; label: string }[] = [
@@ -31,22 +33,29 @@ export function App() {
   const [form, setForm] = useState<FormState>(null);
 
   const [q, setQ] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [status, setStatus] = useState<ApplicationStatus[]>([]);
   const [source, setSource] = useState<JobSource | "">("");
   const [sort, setSort] = useState<(typeof SORTS)[number]["value"]>("updated_at:desc");
 
   const [sortField, order] = sort.split(":") as [SortField, "asc" | "desc"];
   const debouncedExtra = useDebounced(extra, 300);
+  // "#python" im Suchfeld wirkt wie ein Klick auf den Hashtag, der Rest bleibt Freitext.
+  const typed = splitHashtags(useDebounced(q));
+  const activeTags = typed.tags.reduce(addUnique, tags);
   const filter: PostingFilter = {
     ...debouncedExtra,
-    q: useDebounced(q),
+    q: typed.text,
+    tag: activeTags,
     status,
     source: source ? [source] : [],
     sort: sortField,
     order,
   };
   const { data, isLoading, isFetching } = usePostings(filter);
-  const filtered = Boolean(filter.q || status.length || source || activeFilterCount(extra));
+  const filtered = Boolean(filter.q || status.length || source || activeTags.length || activeFilterCount(extra));
+  const toggleTag = (t: string) =>
+    setTags((cur) => (cur.some((x) => sameTag(x, t)) ? cur.filter((x) => !sameTag(x, t)) : [...cur, t]));
 
   const toggleStatus = (s: ApplicationStatus | null) =>
     setStatus((cur) => (s === null ? [] : cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
@@ -102,7 +111,7 @@ export function App() {
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
             </svg>
-            <input type="search" placeholder="Titel, Firma, Ort …" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input type="search" placeholder="Titel, Firma, Ort oder #hashtag …" value={q} onChange={(e) => setQ(e.target.value)} />
           </label>
           <button type="button" className="btn btn--primary topbar__new" onClick={() => setForm({ mode: "create" })}>
             Neue Stelle
@@ -149,6 +158,7 @@ export function App() {
             </span>
           </div>
           {showFilters && <FilterPanel value={extra} onChange={setExtra} />}
+          <TagFilterBar selected={activeTags} onToggle={toggleTag} />
           <PostingList
             items={data?.items ?? []}
             selectedId={selectedId}
@@ -156,6 +166,7 @@ export function App() {
             loading={isLoading}
             filtered={filtered}
             onCreate={() => setForm({ mode: "create" })}
+            activeTags={activeTags}
           />
         </section>
 

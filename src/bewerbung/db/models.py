@@ -10,6 +10,9 @@ Designprinzipien:
   später Trainingsdaten "as of" einem Stichtag ohne Data Leakage rekonstruieren.
 * Löschen ist ein Soft-Delete (``archived_at``), Rohdaten der Quelle bleiben in
   ``raw_payload`` erhalten.
+* Hashtags hängen über ``posting_tags`` an Stellen. Entfernen setzt ``removed_at``
+  statt zu löschen, sodass sich nachvollziehen lässt, wann eine Stelle wie
+  eingeordnet war (Labels für spätere Modelle).
 """
 
 from __future__ import annotations
@@ -128,11 +131,65 @@ class JobPosting(TimestampMixin, Base):
     applications: Mapped[list[Application]] = relationship(
         back_populates="posting", order_by="Application.id"
     )
+    tag_links: Mapped[list[PostingTag]] = relationship(
+        back_populates="posting", order_by="PostingTag.id"
+    )
 
     @property
     def application(self) -> Application | None:
         """Neueste Bewerbung; das Modell erlaubt mehrere (z. B. erneute Bewerbung)."""
         return self.applications[-1] if self.applications else None
+
+    @property
+    def tags(self) -> list[str]:
+        """Aktuell gesetzte Hashtags (ohne entfernte), alphabetisch."""
+        return sorted(
+            (link.tag.name for link in self.tag_links if link.removed_at is None),
+            key=str.casefold,
+        )
+
+
+class Tag(TimestampMixin, Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Anzeigename in der zuerst verwendeten Schreibweise, z. B. "Python".
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    # Normalisierter Schlüssel ("python"), über den Schreibvarianten zusammenfallen.
+    key: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+
+
+class PostingTag(Base):
+    """Zuordnung Stelle <-> Hashtag mit Gültigkeitszeitraum (added_at .. removed_at)."""
+
+    __tablename__ = "posting_tags"
+    __table_args__ = (
+        # Pro Stelle und Tag höchstens eine aktive Zuordnung.
+        Index(
+            "uq_posting_tags_active",
+            "posting_id",
+            "tag_id",
+            unique=True,
+            sqlite_where=text("removed_at IS NULL"),
+            postgresql_where=text("removed_at IS NULL"),
+        ),
+        Index("ix_posting_tags_tag_removed", "tag_id", "removed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    posting_id: Mapped[int] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tag_id: Mapped[int] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"), nullable=False
+    )
+    # Woher die Zuordnung kam: "manual" (Formular/Detail) oder "note" (#tag in einer Notiz).
+    origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    posting: Mapped[JobPosting] = relationship(back_populates="tag_links")
+    tag: Mapped[Tag] = relationship(lazy="joined")
 
 
 class Application(TimestampMixin, Base):

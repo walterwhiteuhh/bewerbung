@@ -31,8 +31,9 @@ from bewerbung.domain.schemas import (
     SourceDetection,
     Stats,
     StatusChange,
+    TagCount,
 )
-from bewerbung.services import applications, importer, postings, search, stats
+from bewerbung.services import applications, importer, postings, search, stats, tags
 
 router = APIRouter(prefix="/api")
 
@@ -63,7 +64,10 @@ async def import_preview(
 
 @router.get("/postings", response_model=PostingPage, tags=["postings"])
 def list_postings(session: SessionDep, flt: Annotated[PostingFilter, Query()]) -> PostingPage:
-    """Filter: ``q`` (Freitext), ``status``/``source`` (mehrfach), Sortierung, Paginierung."""
+    """Filter: ``q`` (Freitext), ``status``/``source``/``tag`` (mehrfach), Sortierung, Paginierung.
+
+    Mehrere ``tag``-Werte sind UND-verknüpft: nur Stellen, die alle Hashtags tragen.
+    """
     items, total = postings.list_postings(session, flt)
     return PostingPage(
         items=[PostingListItem.model_validate(p) for p in items],
@@ -213,6 +217,12 @@ def save_listing(
 
 
 # --- Statistik ---------------------------------------------------------------
+
+
+@router.get("/tags", response_model=list[TagCount], tags=["postings"])
+def list_tags(session: SessionDep) -> list[TagCount]:
+    """Alle Hashtags mit Anzahl der (nicht archivierten) Stellen, häufigste zuerst."""
+    return tags.list_tags(session)
 
 
 @router.get("/stats", response_model=Stats, tags=["stats"])
