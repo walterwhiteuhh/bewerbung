@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from bewerbung.domain.enums import JobSource, RemoteType
+from bewerbung.domain.enums import WORK_TIME_LABEL, JobSource, RemoteType
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,11 @@ def to_draft(item: dict[str, Any]) -> ListingDraft | None:
     )
 
 
+# Codes der Jobsuche-API: arbeitszeit (vz/tz/mj/snw), angebotsart (1/2/4/34).
+_WORK_TIME_CODES = {"vollzeit": "vz", "teilzeit": "tz", "minijob": "mj", "schicht": "snw"}
+_OFFER_CODES = {"arbeit": 1, "selbststaendig": 2, "ausbildung": 4, "praktikum": 34}
+
+
 class ArbeitsagenturProvider:
     source = JobSource.ARBEITSAGENTUR
     label = "Arbeitsagentur"
@@ -111,8 +116,11 @@ class ArbeitsagenturProvider:
             "was": query.query,
             "size": query.limit,
             "page": 1,
-            "angebotsart": 1,  # Arbeit (keine Ausbildung/Selbstständigkeit)
+            "angebotsart": _OFFER_CODES[query.offer_type],
         }
+        if query.work_times:
+            # Mehrere Codes mit Semikolon = ODER-Verknüpfung.
+            params["arbeitszeit"] = ";".join(_WORK_TIME_CODES[w] for w in query.work_times)
         if query.location:
             params["wo"] = query.location
             if query.radius_km is not None:
@@ -139,5 +147,12 @@ class ArbeitsagenturProvider:
         drafts = [d for d in (to_draft(i) for i in items) if d is not None]
         if query.remote_only:
             drafts = [d.model_copy(update={"remote_type": RemoteType.HYBRID}) for d in drafts]
+        if len(query.work_times) == 1:
+            # Die Trefferliste nennt die Arbeitszeit nicht; der Filter garantiert sie aber.
+            label = WORK_TIME_LABEL[query.work_times[0]]
+            drafts = [
+                d if d.employment_type else d.model_copy(update={"employment_type": label})
+                for d in drafts
+            ]
         logger.info("Arbeitsagentur: %d Treffer für %r", len(drafts), query.query)
         return drafts

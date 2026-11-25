@@ -220,11 +220,18 @@ export interface SearchHit {
   listing: Listing;
 }
 
+export const WORK_TIMES = ["vollzeit", "teilzeit", "minijob", "schicht"] as const;
+export type WorkTime = (typeof WORK_TIMES)[number];
+export const OFFER_TYPES = ["arbeit", "ausbildung", "praktikum", "selbststaendig"] as const;
+export type OfferType = (typeof OFFER_TYPES)[number];
+
 export interface SearchParams {
   query: string;
   location: string | null;
   radius_km: number | null;
   remote_only: boolean;
+  work_times: WorkTime[];
+  offer_type: OfferType;
   sources: JobSource[];
   profile_id?: number | null;
 }
@@ -236,6 +243,8 @@ export interface SearchRunSummary {
   location: string | null;
   radius_km: number | null;
   remote_only: boolean;
+  work_times: WorkTime[];
+  offer_type: OfferType;
   sources: string[];
   started_at: string;
   finished_at: string | null;
@@ -255,6 +264,8 @@ export interface SearchProfile {
   location: string | null;
   radius_km: number | null;
   remote_only: boolean;
+  work_times: WorkTime[];
+  offer_type: OfferType;
   sources: JobSource[];
   created_at: string;
 }
@@ -316,4 +327,24 @@ export interface LetterContext {
   matching_skills: string[];
   profile_complete: boolean;
   missing_profile_fields: string[];
+}
+
+// --- Unterlagen ------------------------------------------------------------
+
+export const DOCUMENT_KINDS = ["lebenslauf", "zeugnis", "zertifikat", "anschreiben", "sonstiges"] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+export interface DocumentInfo {
+  id: number;
+  kind: DocumentKind;
+  title: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  page_count: number | null;
+  has_text: boolean;
+  text_preview: string | null;
+  is_primary: boolean;
+  created_at: string;
+  archived_at: string | null;
 }

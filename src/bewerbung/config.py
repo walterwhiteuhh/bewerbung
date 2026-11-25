@@ -48,9 +48,25 @@ class Settings(BaseSettings):
     )
     gemini_model: str = "gemini-2.5-pro"
     cover_letter_timeout: float = 120.0
+    documents_dir: Path | None = Field(
+        default=None,
+        description="Ablage für Uploads. Standard: Ordner 'documents' neben der SQLite-Datei.",
+    )
+    max_upload_mb: int = 15
     auto_migrate: bool = Field(
         default=True, description="Alembic-Migrationen beim Start automatisch ausführen."
     )
+
+
+def resolve_documents_dir(settings: Settings) -> Path:
+    """Uploads liegen neben der Datenbank, damit ein Backup des Datenordners alles enthält."""
+    if settings.documents_dir is not None:
+        return settings.documents_dir
+    prefix = "sqlite:///"
+    if settings.database_url.startswith(prefix) and settings.database_url != "sqlite://":
+        db_path = Path(settings.database_url.removeprefix(prefix))
+        return db_path.parent / "documents"
+    return Path.cwd() / "data" / "documents"
 
 
 @lru_cache

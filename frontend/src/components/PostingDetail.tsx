@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, formatSalary, isoToLocalDate, localDateToIs
 import { EXITS, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 import { Dialog } from "./Dialog";
+import { PostingDocuments } from "./Documents";
 import { GENERATOR_LABEL, LetterStudio } from "./LetterStudio";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toast";
@@ -16,7 +17,7 @@ interface Props {
   onClose: () => void;
   onEdit: (p: Posting) => void;
   showClose: boolean;
-  onOpenProfile: () => void;
+  onOpenProfile: (tab?: "angaben" | "unterlagen") => void;
 }
 
 export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }: Props) {
@@ -72,7 +73,9 @@ export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }:
 
       <TagsSection posting={p} />
 
-      <LetterSection posting={p} onOpenProfile={onOpenProfile} />
+      <LetterSection posting={p} onOpenProfile={() => onOpenProfile("angaben")} />
+
+      <PostingDocuments postingId={p.id} onManage={() => onOpenProfile("unterlagen")} />
 
       {app && <ApplicationFields key={app.id} app={app} />}
 

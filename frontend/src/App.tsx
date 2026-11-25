@@ -7,6 +7,7 @@ import { EMPTY_EXTRA, FilterPanel, activeFilterCount } from "./components/Filter
 import { PostingDetail } from "./components/PostingDetail";
 import { PostingForm } from "./components/PostingForm";
 import { PostingList } from "./components/PostingList";
+import { DocumentsPanel } from "./components/Documents";
 import { ProfileForm } from "./components/ProfileForm";
 import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
@@ -23,6 +24,7 @@ const SORTS: { value: `${SortField}:${"asc" | "desc"}`; label: string }[] = [
   { value: "title:asc", label: "Titel A–Z" },
 ];
 
+type ProfileTab = "angaben" | "unterlagen";
 type FormState = { mode: "create" } | { mode: "edit"; posting: Posting } | null;
 
 export function App() {
@@ -32,7 +34,7 @@ export function App() {
   const [extra, setExtra] = useState(EMPTY_EXTRA);
   const [showFilters, setShowFilters] = useState(false);
   const [form, setForm] = useState<FormState>(null);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState<ProfileTab | null>(null);
 
   const [q, setQ] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -79,13 +81,21 @@ export function App() {
     </nav>
   );
   const profileButton = (
-    <button type="button" className="btn btn--ghost topbar__profile" onClick={() => setProfileOpen(true)}>
+    <button type="button" className="btn btn--ghost topbar__profile" onClick={() => setProfileTab("angaben")}>
       Mein Profil
     </button>
   );
   const profileDialog = (
-    <Dialog open={profileOpen} title="Mein Profil" onClose={() => setProfileOpen(false)}>
-      <ProfileForm onDone={() => setProfileOpen(false)} />
+    <Dialog open={profileTab !== null} title="Mein Profil" onClose={() => setProfileTab(null)}>
+      <nav className="tabs tabs--light profile-tabs" aria-label="Profil">
+        <button type="button" className={profileTab === "angaben" ? "is-active" : ""} onClick={() => setProfileTab("angaben")}>
+          Angaben
+        </button>
+        <button type="button" className={profileTab === "unterlagen" ? "is-active" : ""} onClick={() => setProfileTab("unterlagen")}>
+          Unterlagen
+        </button>
+      </nav>
+      {profileTab === "unterlagen" ? <DocumentsPanel /> : <ProfileForm onDone={() => setProfileTab(null)} />}
     </Dialog>
   );
 
@@ -193,7 +203,7 @@ export function App() {
               onClose={() => select(null)}
               onEdit={(posting) => setForm({ mode: "edit", posting })}
               showClose={!isWide}
-              onOpenProfile={() => setProfileOpen(true)}
+              onOpenProfile={(tab = "angaben") => setProfileTab(tab)}
             />
           ) : (
             <div className="empty empty--detail">

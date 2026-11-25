@@ -118,6 +118,8 @@ async def run_search(
         location=req.location,
         radius_km=req.radius_km,
         remote_only=req.remote_only,
+        work_times=req.work_times,
+        offer_type=req.offer_type,
     )
     run = SearchRun(
         profile_id=req.profile_id,
@@ -125,6 +127,8 @@ async def run_search(
         location=req.location,
         radius_km=req.radius_km,
         remote_only=req.remote_only,
+        work_times=list(req.work_times),
+        offer_type=req.offer_type,
         sources=[p.source.value for p in wanted],
         started_at=utcnow(),
     )

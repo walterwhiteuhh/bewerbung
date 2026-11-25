@@ -14,7 +14,7 @@ from pydantic import (
     model_validator,
 )
 
-from bewerbung.domain.enums import ApplicationStatus, JobSource, RemoteType
+from bewerbung.domain.enums import ApplicationStatus, JobSource, OfferType, RemoteType, WorkTime
 from bewerbung.domain.tags import unique_tags
 
 
@@ -291,6 +291,8 @@ class SearchRequest(_Schema):
     location: OptStr = Field(default=None, max_length=255)
     radius_km: int | None = Field(default=None, ge=0, le=200)
     remote_only: bool = False
+    work_times: list[WorkTime] = Field(default_factory=list, description="Leer = alle")
+    offer_type: OfferType = "arbeit"
     sources: list[JobSource] = Field(
         default_factory=list, description="Leer = alle verfügbaren Provider"
     )
@@ -335,6 +337,8 @@ class SearchRunSummary(_Schema):
     location: str | None
     radius_km: int | None
     remote_only: bool
+    work_times: list[str]
+    offer_type: str
     sources: list[str]
     started_at: datetime
     finished_at: datetime | None
@@ -353,6 +357,8 @@ class SearchProfileCreate(_Schema):
     location: OptStr = Field(default=None, max_length=255)
     radius_km: int | None = Field(default=None, ge=0, le=200)
     remote_only: bool = False
+    work_times: list[WorkTime] = Field(default_factory=list)
+    offer_type: OfferType = "arbeit"
     sources: list[JobSource] = Field(default_factory=list)
 
 
@@ -445,3 +451,38 @@ class LetterContextPreview(_Schema):
     matching_skills: list[str]
     profile_complete: bool
     missing_profile_fields: list[str]
+
+
+# --- Unterlagen ----------------------------------------------------------------
+
+DocumentKind = Literal["lebenslauf", "zeugnis", "zertifikat", "anschreiben", "sonstiges"]
+
+
+class DocumentRead(_Schema):
+    id: int
+    kind: DocumentKind
+    title: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    page_count: int | None
+    has_text: bool
+    text_preview: str | None
+    is_primary: bool
+    created_at: datetime
+    archived_at: datetime | None
+
+
+class DocumentUpdate(_Schema):
+    kind: DocumentKind | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    is_primary: bool | None = None
+
+
+class DocumentText(_Schema):
+    id: int
+    text: str | None
+
+
+class PostingDocumentsUpdate(_Schema):
+    document_ids: list[int] = Field(default_factory=list, max_length=50)

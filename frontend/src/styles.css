@@ -1073,3 +1073,86 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   box-shadow: inset 4px 0 0 var(--accent);
 }
 .editor__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* --- Suche: Arbeitszeit ---------------------------------------------------- */
+.search-form__label { font-size: 0.8rem; margin-right: 2px; }
+.search-form__offer { width: auto; min-height: 36px; padding-top: 4px; padding-bottom: 4px; }
+@media (min-width: 640px) {
+  .search-form__offer { margin-left: auto; }
+}
+
+/* --- Unterlagen ----------------------------------------------------------- */
+.docs { display: grid; gap: 12px; }
+.dropzone {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dropzone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.dropzone strong { font-family: var(--font-display); font-size: 1.05rem; }
+.dropzone svg { width: 28px; height: 28px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.doc-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.doc {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.doc__icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.doc__icon--pdf { background: #fde3df; color: #b3261e; }
+.doc__icon--docx { background: #dfe8fd; color: #1f4fd1; }
+.doc__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.doc__title { font-weight: 650; overflow-wrap: anywhere; }
+.doc__meta { font-size: 0.82rem; }
+.doc__preview { grid-column: 1 / -1; font-size: 0.82rem; color: var(--muted); max-height: 3.6em; overflow: hidden; }
+.doc__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.doc__actions select { width: auto; min-height: 32px; padding: 2px 28px 2px 10px; font-size: 0.85rem; }
+.badge-primary {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--marker);
+  color: var(--on-marker);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.doc-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.doc-picks .chip { max-width: 100%; }
+.profile-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+@media (prefers-color-scheme: dark) {
+  .doc__icon--pdf { background: #4a1f1b; color: #ffb4a9; }
+  .doc__icon--docx { background: #1d2850; color: #b3c5ff; }
+}
+.link-btn { padding: 0; border: none; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.tabs--light { background: var(--surface-2); max-width: 320px; }
+.tabs--light button { color: var(--muted); }
+.tabs--light button:hover { color: var(--text); }
+.tabs--light button.is-active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(12 17 29 / 0.15); }
+a.doc__title { color: var(--text); text-decoration: none; }
+a.doc__title:hover { color: var(--accent); text-decoration: underline; }

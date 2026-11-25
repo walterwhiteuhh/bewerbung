@@ -26,3 +26,9 @@ class InvalidTransitionError(DomainError):
 
 class LetterGenerationError(DomainError):
     """Der Textgenerator (z. B. Claude-API) ist fehlgeschlagen."""
+
+
+class DuplicateDocumentError(DomainError):
+    def __init__(self, existing_id: int) -> None:
+        super().__init__(f"Diese Datei ist schon hochgeladen (Dokument {existing_id})")
+        self.existing_id = existing_id

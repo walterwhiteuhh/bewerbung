@@ -64,6 +64,8 @@ frontend/      React + TypeScript + Vite, TanStack Query, mobile-first CSS
 | `tags` / `posting_tags` | Hashtags. `tags.key` ist der normalisierte Name ("Python" = "python"); Zuordnungen werden beim Entfernen mit `removed_at` beendet statt gelöscht, `origin` sagt, ob sie von Hand oder aus einer Notiz (`#tag`) kamen |
 | `notes` | Notizen pro Bewerbung |
 | `applicant_profiles` | Eigenes Profil (eine Zeile) |
+| `documents` | Hochgeladene Unterlagen: Art, SHA-256, ausgelesener Text mit Extraktor-Version, Haupt-Lebenslauf; Soft-Delete |
+| `posting_documents` | Welche Unterlagen zu welcher Bewerbung gehören; Entfernen setzt `detached_at` |
 | `cover_letters` | Anschreiben-Fassungen je Stelle: `body_generated` bleibt unverändert, `body` ist editierbar; `input_snapshot`, `generator`, `model`, `prompt_version`, Tokens und Dauer für spätere Auswertung |
 | `listings` | Anzeige je Portal (Rohsicht); `posting_id` NULL = Suchtreffer, sonst verknüpfte Stelle |
 | `search_profiles` | Gespeicherte Suchen |
@@ -87,7 +89,11 @@ Fehlermeldung; dann die Felder manuell ausfüllen.
 
 ### Suche in Portalen
 
-Der Reiter „Suche in Portalen“ fragt offizielle Such-Schnittstellen parallel ab:
+Der Reiter „Suche in Portalen“ fragt offizielle Such-Schnittstellen parallel ab. Filter für die
+Arbeitszeit (Vollzeit, Teilzeit, Minijob, Schicht/Nacht/Wochenende, mehrere = ODER) und die Art
+des Angebots (Arbeitsstelle, Ausbildung, Praktikum, Selbstständigkeit) gehen bei der
+Arbeitsagentur direkt an die API; Adzuna kennt nur Voll-/Teilzeit, dort wird „Minijob“ als
+Suchwort ergänzt.
 
 | Quelle | Einrichtung |
 |---|---|
@@ -117,6 +123,17 @@ Für KI-Texte einen oder mehrere Keys in die `.env` im Projektordner eintragen:
 Danach die App neu starten. „Automatisch“ nimmt den ersten Anbieter mit Key (Reihenfolge wie oben),
 im Dialog lässt sich jeder einzeln wählen. Ohne Key entsteht ein Entwurf aus einer Vorlage.
 Hinweis: Beim Erstellen gehen Stellendaten und Profil an den gewählten Anbieter.
+
+### Unterlagen
+
+Unter „Mein Profil → Unterlagen“ lassen sich Lebenslauf, Zeugnisse, Zertifikate usw. hochladen
+(PDF, Word .docx, Text, PNG/JPG, bis 15 MB, per Drag-and-drop). Der Dateityp wird am Inhalt
+erkannt, nicht an der Endung. Text aus PDF und Word wird ausgelesen; der Haupt-Lebenslauf fließt
+automatisch in die Anschreiben ein, falls im Profil kein Lebenslauf-Text steht („Text ins Profil“
+übernimmt ihn dauerhaft). In jeder Stelle markierst du, welche Unterlagen du mitschickst.
+
+Die Dateien liegen inhaltsadressiert (SHA-256) im Ordner `documents` neben der Datenbank,
+also unter `data/documents/`. Ein Backup von `data/` enthält damit alles.
 
 ### Neue Quelle anbinden
 
@@ -155,5 +172,9 @@ default_registry().register(XingAdapter())
 | GET | `/api/postings/{id}/letter-context` | Erkanntes Portal, Hashtags, passende Skills |
 | GET/POST | `/api/postings/{id}/letters` | Fassungen auflisten / neue erzeugen |
 | PATCH | `/api/letters/{id}` | Text bearbeiten, als final markieren |
+| GET/POST | `/api/documents` | Unterlagen auflisten / hochladen (multipart, 409 bei Dublette) |
+| GET | `/api/documents/{id}/file` | Datei ansehen (`?download=true` zum Herunterladen) |
+| PATCH | `/api/documents/{id}` · POST `/archive` · `/use-as-cv` | Art/Titel/Haupt-CV ändern, archivieren, Text ins Profil |
+| GET/PUT | `/api/postings/{id}/documents` | Unterlagen einer Bewerbung |
 
 Vollständig und interaktiv unter `/docs`.

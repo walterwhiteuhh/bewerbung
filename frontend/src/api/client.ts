@@ -20,6 +20,8 @@ import type {
   LetterContext,
   LetterRequest,
   Profile,
+  DocumentInfo,
+  DocumentKind,
 } from "./types";
 
 export class ApiError extends Error {
@@ -110,6 +112,25 @@ export const api = {
   letters: (postingId: number) => request<CoverLetter[]>(`/postings/${postingId}/letters`),
   generateLetter: (postingId: number, r: LetterRequest) =>
     request<CoverLetter>(`/postings/${postingId}/letters`, json("POST", r)),
+  documents: () => request<DocumentInfo[]>("/documents"),
+  uploadDocument: async (file: File, kind?: DocumentKind): Promise<DocumentInfo> => {
+    const body = new FormData();
+    body.append("file", file);
+    if (kind) body.append("kind", kind);
+    // Kein Content-Type setzen: der Browser ergänzt die multipart-Grenze selbst.
+    const resp = await fetch("/api/documents", { method: "POST", body });
+    const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!resp.ok) throw new ApiError(resp.status, describe(data.detail) || resp.statusText, data);
+    return data as unknown as DocumentInfo;
+  },
+  updateDocument: (id: number, data: Partial<Pick<DocumentInfo, "kind" | "title" | "is_primary">>) =>
+    request<DocumentInfo>(`/documents/${id}`, json("PATCH", data)),
+  archiveDocument: (id: number) => request<DocumentInfo>(`/documents/${id}/archive`, { method: "POST" }),
+  useDocumentAsCv: (id: number) => request<Profile>(`/documents/${id}/use-as-cv`, { method: "POST" }),
+  documentUrl: (id: number, download = false) => `/api/documents/${id}/file${download ? "?download=true" : ""}`,
+  postingDocuments: (postingId: number) => request<DocumentInfo[]>(`/postings/${postingId}/documents`),
+  setPostingDocuments: (postingId: number, ids: number[]) =>
+    request<DocumentInfo[]>(`/postings/${postingId}/documents`, json("PUT", { document_ids: ids })),
   updateLetter: (id: number, data: Partial<Pick<CoverLetter, "body" | "status">>) =>
     request<CoverLetter>(`/letters/${id}`, json("PATCH", data)),
 };

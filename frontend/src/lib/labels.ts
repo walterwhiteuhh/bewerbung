@@ -1,4 +1,4 @@
-import type { ApplicationStatus, JobSource, RemoteType } from "../api/types";
+import type { ApplicationStatus, JobSource, DocumentKind, OfferType, RemoteType, WorkTime } from "../api/types";
 
 export const STATUS_LABEL: Record<ApplicationStatus, string> = {
   saved: "Gemerkt",
@@ -38,4 +38,26 @@ export const REMOTE_LABEL: Record<RemoteType, string> = {
   hybrid: "Hybrid",
   remote: "Remote",
   unknown: "Unbekannt",
+};
+
+export const WORK_TIME_LABEL: Record<WorkTime, string> = {
+  vollzeit: "Vollzeit",
+  teilzeit: "Teilzeit",
+  minijob: "Minijob",
+  schicht: "Schicht/Nacht/WE",
+};
+
+export const OFFER_TYPE_LABEL: Record<OfferType, string> = {
+  arbeit: "Arbeitsstelle",
+  ausbildung: "Ausbildung / Duales Studium",
+  praktikum: "Praktikum / Trainee",
+  selbststaendig: "Selbstständigkeit",
+};
+
+export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
+  lebenslauf: "Lebenslauf",
+  zeugnis: "Zeugnis",
+  zertifikat: "Zertifikat",
+  anschreiben: "Anschreiben",
+  sonstiges: "Sonstiges",
 };

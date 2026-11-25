@@ -81,7 +81,15 @@ class AdzunaProvider:
     async def search(self, query: SearchQuery) -> list[ListingDraft]:
         if self.unavailable_reason:
             raise ProviderError(self.unavailable_reason)
-        what = f"{query.query} remote" if query.remote_only else query.query
+        # Adzuna kennt nur Voll-/Teilzeit; Minijob, Ausbildung & Co. gehen als Suchwort mit.
+        words = [query.query]
+        if query.remote_only:
+            words.append("remote")
+        if query.work_times == ["minijob"]:
+            words.append("minijob")
+        if query.offer_type in {"ausbildung", "praktikum"}:
+            words.append(query.offer_type)
+        what = " ".join(words)
         params: dict[str, str | int] = {
             "app_id": self._app_id or "",
             "app_key": self._app_key or "",
@@ -89,6 +97,11 @@ class AdzunaProvider:
             "results_per_page": query.limit,
             "content-type": "application/json",
         }
+        times = set(query.work_times)
+        if times == {"vollzeit"}:
+            params["full_time"] = 1
+        elif times and times <= {"teilzeit", "minijob"}:
+            params["part_time"] = 1
         if query.location:
             params["where"] = query.location
             if query.radius_km is not None:
