@@ -22,6 +22,15 @@ const MIN_TAP = 32; // px; Apple/Google empfehlen 44/48, kleine Inline-Elemente 
 
 /** Elemente, die rechts oder links aus dem Viewport ragen, ohne in einem Scroll-Container zu liegen. */
 async function layoutIssues(page: Page): Promise<string[]> {
+  // Einblend-Animationen (Detail, Sheets) abwarten; Endlos-Animationen wie die Wellen nicht.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   return page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
     const issues: string[] = [];
@@ -99,7 +108,7 @@ for (const vp of VIEWPORTS) {
       else await expect(page.locator(".fab")).toBeHidden();
       if (vp.width >= 1024) {
         // Ohne Auswahl zeigt die Detailspalte das Segelschiff statt einer leeren Fläche.
-        await expect(page.getByRole("img", { name: "Segelschiff auf bewegter See" })).toBeVisible();
+        await expect(page.getByRole("button", { name: /Segelschiff auf bewegter See/ })).toBeVisible();
       }
       if (vp.touch) expect(await smallTapTargets(page)).toEqual([]);
       expect(errors).toEqual([]);
@@ -203,10 +212,21 @@ test.describe("Segelschiff", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.goto("/#/");
-    await expect(page.getByRole("img", { name: "Segelschiff auf bewegter See" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Segelschiff auf bewegter See/ })).toBeVisible();
     const running = await page.evaluate(
       () => [...document.querySelectorAll(".ship *")].filter((el) => getComputedStyle(el).animationName !== "none").length,
     );
     expect(running).toBe(0);
+  });
+
+  test("Antippen ruft Ahoi und das Schiff springt", async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.goto("/#/");
+    const ship = page.getByRole("button", { name: /Segelschiff auf bewegter See/ });
+    await ship.click();
+    await expect(ship.locator(".ship__bubble")).toContainText("Ahoi!");
+    await expect(ship.locator(".ship__hop.is-hopping")).toHaveCount(1);
+    await ship.click();
+    await expect(ship.locator(".ship__bubble")).toContainText("Leinen los!");
   });
 });
