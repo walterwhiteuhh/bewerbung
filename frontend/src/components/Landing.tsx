@@ -3,6 +3,7 @@
  * Reines Markup + CSS (Klassen `lp-*`), keine Daten-Abfragen: die Seite lädt sofort.
  */
 import { ShipScene } from "./ShipScene";
+import { Ticker } from "./Ticker";
 
 const APP_HREF = "#/";
 
@@ -130,6 +131,8 @@ export function Landing() {
             </div>
           </div>
         </section>
+
+        <Ticker />
 
         <div className="lp-horizon" aria-hidden>
           <span>53°33′ N</span>

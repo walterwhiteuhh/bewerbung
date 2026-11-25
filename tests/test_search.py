@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator
+from datetime import timedelta
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from bewerbung.config import Settings
+from bewerbung.db.models import SearchRun
+from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import JobSource, RemoteType
 from bewerbung.main import create_app
 from bewerbung.search.adzuna import AdzunaProvider
@@ -426,3 +430,63 @@ def test_missing_keys_only_reported_when_source_chosen(
         assert c.post("/api/search", json={"query": "x"}).json()["errors"] == []
         chosen = c.post("/api/search", json={"query": "x", "sources": ["jooble"]}).json()
         assert chosen["errors"] == [{"source": "jooble", "message": "API-Key fehlt"}]
+
+
+def _backdate(client: TestClient, run_id: int, days: int) -> None:
+    factory = client.app.state.session_factory  # type: ignore[attr-defined]
+    with factory() as s, s.begin():
+        s.get(SearchRun, run_id).started_at = utcnow() - timedelta(days=days)  # type: ignore[union-attr]
+
+
+def test_run_history_filter_and_partial_clear(search_client: TestClient) -> None:
+    old = search_client.post("/api/search", json={"query": "alt", "location": "Kiel"}).json()["id"]
+    mid = search_client.post("/api/search", json={"query": "mitte"}).json()["id"]
+    new = search_client.post("/api/search", json={"query": "neu"}).json()["id"]
+    _backdate(search_client, old, 40)
+    _backdate(search_client, mid, 10)
+
+    ids = lambda **p: [r["id"] for r in search_client.get("/api/search/runs", params=p).json()]  # noqa: E731
+    assert ids() == [new, mid, old]  # nach Datum, neueste zuerst
+    assert ids(q="kiel") == [old]  # Text sucht auch im Ort
+    week_ago = (utcnow() - timedelta(days=14)).isoformat()
+    assert ids(**{"from": week_ago}) == [new, mid]
+    assert ids(to=week_ago) == [old]
+
+    # Teilweise löschen: nur einzelne IDs, dann alles vor einem Datum
+    assert search_client.delete("/api/search/runs", params={"ids": [mid, new]}).json() == {
+        "hidden": 2
+    }
+    assert ids() == [old]
+    # Komplett, die Läufe bleiben in der DB (Historie für Auswertungen)
+    assert search_client.delete("/api/search/runs", params={"to": week_ago}).json() == {"hidden": 1}
+    assert ids() == []
+    assert search_client.get(f"/api/search/runs/{old}").status_code == 200
+    # Bereits ausgeblendete werden nicht doppelt gezählt
+    assert search_client.delete("/api/search/runs").json() == {"hidden": 0}
+
+
+def test_search_persist_uses_constant_number_of_queries(settings: Settings) -> None:
+    """Treffer werden gesammelt vorgeladen: die Zahl der SELECTs hängt nicht von der Trefferzahl ab."""
+    drafts = [
+        draft(JobSource.ARBEITSAGENTUR, f"1-{i}", f"Job {i}", company_name=f"Firma {i % 7}")
+        for i in range(60)
+    ]
+    prov = FakeProvider(JobSource.ARBEITSAGENTUR, drafts)
+    with TestClient(create_app(settings, search_providers=[prov])) as c:
+        engine = c.app.state.session_factory.kw["bind"]  # type: ignore[attr-defined]
+        selects: list[str] = []
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def _count(_c, _cur, statement, *_a):  # type: ignore[no-untyped-def]
+            if statement.lstrip().upper().startswith("SELECT"):
+                selects.append(statement)
+
+        first = c.post("/api/search", json={"query": "x"}).json()
+        assert (first["total_hits"], first["new_hits"]) == (60, 60)
+        n_first = len(selects)
+        selects.clear()
+        second = c.post("/api/search", json={"query": "x"}).json()
+        assert (second["total_hits"], second["new_hits"]) == (60, 0)
+        # Antwort inkl. Merkmale mitgezählt; mit 60 statt 6 Treffern käme ein Vielfaches
+        assert n_first < 60, n_first
+        assert len(selects) < 60, len(selects)

@@ -3,11 +3,12 @@ import { CompanyLogo } from "./CompanyLogo";
 import { FeatureChips } from "./Insights";
 import { sortHits, type HitSort } from "../lib/sortHits";
 import { PlaceHover } from "./PlaceCard";
+import { RunHistory } from "./RunHistory";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
 import { OFFER_TYPES, WORK_TIMES, type JobFeatures, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchRun, type WorkTime } from "../api/types";
-import { formatDate, formatSalary, relativeTime } from "../lib/format";
+import { formatDate, formatSalary } from "../lib/format";
 import { OFFER_TYPE_LABEL, REMOTE_LABEL, SOURCE_LABEL, WORK_TIME_LABEL } from "../lib/labels";
 import { MetaLine, SourceTag } from "./Badges";
 import { useToast } from "./Toast";
@@ -23,7 +24,6 @@ export function SearchView({ onOpenPosting }: Props) {
   const qc = useQueryClient();
   const providers = useQuery({ queryKey: ["providers"], queryFn: api.providers, staleTime: 300_000 });
   const profiles = useQuery({ queryKey: ["profiles"], queryFn: api.profiles });
-  const runs = useQuery({ queryKey: ["runs"], queryFn: api.searchRuns });
 
   const [form, setForm] = useState<SearchParams>({
     query: "",
@@ -72,20 +72,6 @@ export function SearchView({ onOpenPosting }: Props) {
       toast(editing ? "Gespeicherte Suche aktualisiert" : "Suche gespeichert");
       setEditing(null);
       void qc.invalidateQueries({ queryKey: ["profiles"] });
-    },
-    onError: (e) => toast(e.message, "error"),
-  });
-
-  const deleteRun = useMutation({
-    mutationFn: api.deleteRun,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["runs"] }),
-    onError: (e) => toast(e.message, "error"),
-  });
-  const clearRuns = useMutation({
-    mutationFn: api.clearRuns,
-    onSuccess: () => {
-      toast("Verlauf geleert");
-      void qc.invalidateQueries({ queryKey: ["runs"] });
     },
     onError: (e) => toast(e.message, "error"),
   });
@@ -317,58 +303,10 @@ export function SearchView({ onOpenPosting }: Props) {
           )}
         </section>
       ) : (
-        <section className="recent">
-          <div className="recent__head">
-            <h3 className="section-title">Letzte Suchen</h3>
-            {(runs.data?.length ?? 0) > 0 && (
-              <button
-                type="button"
-                className="btn btn--small btn--ghost"
-                disabled={clearRuns.isPending}
-                onClick={() => {
-                  if (window.confirm("Verlauf der letzten Suchen leeren?")) clearRuns.mutate();
-                }}
-              >
-                Verlauf leeren
-              </button>
-            )}
-          </div>
-          {(runs.data?.length ?? 0) === 0 ? (
-            <div className="empty">
-              <p className="empty__title">Bereit zum Auslaufen</p>
-              <p>Durchsuche {available.map((p) => SOURCE_LABEL[p.source] ?? p.label).join(" und ") || "die Portale"} gleichzeitig. Treffer kannst du mit einem Klick merken.</p>
-            </div>
-          ) : (
-            <ul className="recent__list">
-              {runs.data!.map((r) => (
-                <li key={r.id} className="recent__row">
-                  <button
-                    type="button"
-                    className="recent__item"
-                    onClick={() => void api.searchRun(r.id).then(setRun).catch((e: Error) => toast(e.message, "error"))}
-                  >
-                    <strong>{r.query}</strong>
-                    <span>{[r.location, r.remote_only ? "Homeoffice" : null, ...(r.work_times ?? []).map((w) => WORK_TIME_LABEL[w])]
-                        .filter(Boolean)
-                        .join(" · ") || "überall"}</span>
-                    <span className="muted">
-                      {r.total_hits} Treffer · {relativeTime(r.started_at)}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn recent__delete"
-                    aria-label={`Suche „${r.query}“ aus dem Verlauf löschen`}
-                    title="Aus dem Verlauf löschen"
-                    onClick={() => deleteRun.mutate(r.id)}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <RunHistory
+          onOpen={setRun}
+          emptyHint={`Durchsuche ${available.map((p) => SOURCE_LABEL[p.source] ?? p.label).join(" und ") || "die Portale"} gleichzeitig. Treffer kannst du mit einem Klick merken.`}
+        />
       )}
     </div>
   );

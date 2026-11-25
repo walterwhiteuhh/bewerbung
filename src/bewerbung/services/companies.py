@@ -28,22 +28,35 @@ logger = logging.getLogger(__name__)
 LOGO_FILES_PATH = "/api/logos/files/{name}"
 
 
-def get_or_create_company(session: Session, name: str) -> Company:
+def get_or_create_company(
+    session: Session, name: str, cache: dict[str, Company] | None = None
+) -> Company:
+    """Firma über den normalisierten Namen finden oder anlegen.
+
+    Mit ``cache`` (name_key -> Firma, z. B. für einen ganzen Suchlauf) entfällt die
+    Einzelabfrage je Anzeige.
+    """
     key = company_key(name)
-    company = session.scalar(select(Company).where(Company.name_key == key))
+    company = cache.get(key) if cache is not None else None
+    if company is None:
+        company = session.scalar(select(Company).where(Company.name_key == key))
     if company is None:
         company = Company(name=name.strip(), name_key=key)
         session.add(company)
         session.flush()
+    if cache is not None:
+        cache[key] = company
     return company
 
 
-def derive_listing_keys(session: Session, listing: Listing) -> None:
+def derive_listing_keys(
+    session: Session, listing: Listing, cache: dict[str, Company] | None = None
+) -> None:
     """Firma, Titel-Schlüssel und strukturierten Ort eines Listings setzen (idempotent)."""
     if listing.posting is not None and listing.posting.company_id is not None:
         listing.company_id = listing.posting.company_id
     elif listing.company_name and listing.company_name.strip():
-        company = get_or_create_company(session, listing.company_name)
+        company = get_or_create_company(session, listing.company_name, cache)
         enrich_from_posting(company, listing.company_logo_url, listing.raw_payload)
         listing.company_id = company.id
     listing.title_key = title_key(listing.title or "")

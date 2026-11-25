@@ -123,9 +123,37 @@ for (const vp of VIEWPORTS) {
       const cta = page.getByRole("link", { name: "Zur App" }).nth(1);
       await expectInViewport(page, ".lp-cta .lp-btn");
       if (vp.touch) expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await page.locator(".lp-ticker").evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await expectInViewport(page, ".lp-ticker");
+      await page.locator(".lp-ticker__toggle").click(); // anhalten, Layout bleibt stabil
+      expect(await layoutIssues(page)).toEqual([]);
       await cta.click();
       await expect(page.locator(".brand")).toBeVisible();
       expect(errors).toEqual([]);
+    });
+
+    test("Verlauf: Menü bleibt im Bild, Auswahl entfernt Suchen", async ({ page }) => {
+      page.on("dialog", (d) => void d.accept());
+      // Alle Breiten teilen sich einen Server: eigener Suchbegriff, damit parallele Tests sich nicht stören.
+      const term = `verlauf ${vp.width}`;
+      await page.goto("/#/suche");
+      await page.getByPlaceholder("z. B. Data Scientist, Python").fill(term);
+      await page.locator("button[type=submit].btn--primary").click();
+      await expect(page.locator(".card--hit").first()).toBeVisible();
+      await page.reload(); // frische Ansicht: ohne geöffnetes Ergebnis zeigt die Suche den Verlauf
+      await page.getByLabel("Verlauf durchsuchen").fill(term);
+      const rows = page.locator(".recent__row");
+      await expect(rows).toHaveCount(1);
+      expect(await layoutIssues(page)).toEqual([]);
+      await page.locator(".menu > summary").evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await page.locator(".menu > summary").click();
+      await expectInViewport(page, ".menu__list");
+      await page.locator(".menu > summary").click();
+      await page.getByRole("button", { name: "Auswählen" }).click();
+      await page.locator(".recent__check").first().check();
+      expect(await layoutIssues(page)).toEqual([]);
+      await page.getByRole("button", { name: "Entfernen" }).click();
+      await expect(rows).toHaveCount(0);
     });
 
     test("Detail: lange Titel und Firmennamen brechen um", async ({ page }) => {
