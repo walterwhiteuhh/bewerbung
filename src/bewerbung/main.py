@@ -56,7 +56,7 @@ def create_app(  # noqa: PLR0917 - Test-Injektion aller externen Dienste
         yield
         app.state.engine.dispose()
 
-    app = FastAPI(title="Bewerbungsmanager", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="Anheuern", version=__version__, lifespan=lifespan)
     engine = build_engine(settings.database_url, echo=settings.sql_echo)
     app.state.engine = engine
     app.state.session_factory = build_session_factory(engine)

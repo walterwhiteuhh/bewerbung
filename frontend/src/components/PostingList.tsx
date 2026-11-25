@@ -28,8 +28,8 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
   if (items.length === 0) {
     return (
       <div className="empty">
-        <p className="empty__title">{filtered ? "Keine Treffer" : "Noch keine Stellen erfasst"}</p>
-        <p>{filtered ? "Passe Suche oder Filter an." : "Füge eine LinkedIn- oder Stepstone-URL ein und leg los."}</p>
+        <p className="empty__title">{filtered ? "Keine Treffer" : "Noch keine Stelle in Sicht"}</p>
+        <p>{filtered ? "Passe Suche oder Filter an." : "Füge den Link einer Anzeige ein oder such in den Portalen, dann geht es los."}</p>
         {!filtered && (
           <button type="button" className="btn btn--primary" onClick={onCreate}>
             Erste Stelle erfassen

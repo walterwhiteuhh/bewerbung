@@ -1,6 +1,7 @@
-# Bewerbungsmanager
+# Anheuern
 
-Stellenanzeigen und Bewerbungen aus mehreren Quellen (LinkedIn, Stepstone, Karriereseiten) an einem Ort organisieren.
+_Kurs auf den nächsten Job._ Stellenanzeigen aus mehreren Portalen finden, Bewerbungen steuern und Anschreiben erstellen, alles an einem Ort.
+(Python-Paket und Ordner heißen weiterhin `bewerbung`.)
 Iteration 1: manuelle Erfassung mit automatischer Quellen-Erkennung, Status-Historie, Notizen, Suche und Kennzahlen.
 Live-Importer docken später an die Quellen-Abstraktion an.
 

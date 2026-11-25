@@ -333,7 +333,7 @@ export function SearchView({ onOpenPosting }: Props) {
           </div>
           {(runs.data?.length ?? 0) === 0 ? (
             <div className="empty">
-              <p className="empty__title">Noch nicht gesucht</p>
+              <p className="empty__title">Bereit zum Auslaufen</p>
               <p>Durchsuche {available.map((p) => SOURCE_LABEL[p.source] ?? p.label).join(" und ") || "die Portale"} gleichzeitig. Treffer kannst du mit einem Klick merken.</p>
             </div>
           ) : (

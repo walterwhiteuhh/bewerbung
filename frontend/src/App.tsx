@@ -207,7 +207,7 @@ export function App() {
             />
           ) : (
             <div className="empty empty--detail">
-              <p className="empty__title">Keine Stelle ausgewählt</p>
+              <p className="empty__title">Noch nichts an Deck</p>
               <p>Wähle links eine Stelle, um Status, Notizen und Verlauf zu sehen.</p>
             </div>
           )}
@@ -240,12 +240,17 @@ export function App() {
 function Brand() {
   return (
     <div className="brand">
-      <svg className="brand__mark" viewBox="0 0 28 28" aria-hidden>
-        <rect x="3" y="5" width="22" height="5" rx="2.5" />
-        <rect x="3" y="12" width="15" height="5" rx="2.5" />
-        <rect x="3" y="19" width="8" height="5" rx="2.5" />
+      <svg className="brand__mark" viewBox="0 0 32 32" aria-hidden>
+        <rect width="32" height="32" rx="9" />
+        <g fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="16" cy="8.2" r="2.6" />
+          <path d="M16 10.8v14.4M11 14.5h10M7.5 18.5c.6 4.4 4.2 6.9 8.5 6.9s7.9-2.5 8.5-6.9M5.8 20.4l1.7-1.9 2 1.6M26.2 20.4l-1.7-1.9-2 1.6" />
+        </g>
       </svg>
-      <h1>Bewerbungen</h1>
+      <div className="brand__text">
+        <h1>Anheuern</h1>
+        <span className="brand__tag">Kurs auf den nächsten Job</span>
+      </div>
     </div>
   );
 }
