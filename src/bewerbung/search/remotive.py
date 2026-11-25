@@ -15,7 +15,7 @@ import httpx
 
 from bewerbung.domain.enums import JobSource, RemoteType
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
-from bewerbung.search.common import clean_html, parse_datetime
+from bewerbung.search.common import clean_html, matches_all, parse_datetime, query_terms
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +89,12 @@ class RemotiveProvider:
         allowed_types = set().union(*(_WORK_TIME_TYPES.get(w, set()) for w in query.work_times))
         if query.offer_type == "praktikum":
             allowed_types = {"internship"}
+        # Remotive ignoriert "search" teilweise (liefert beliebige Stellen): lokal nachfiltern.
+        terms = query_terms(query.query)
         drafts = []
         for job in jobs:
+            if not matches_all(terms, job.get("title"), job.get("tags"), job.get("description")):
+                continue
             region = str(job.get("candidate_required_location") or "")
             if region and not _ALLOWED_REGION.search(region):
                 continue

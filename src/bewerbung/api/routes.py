@@ -206,6 +206,17 @@ def list_runs(
     return [SearchRunSummary.model_validate(r) for r in search.list_runs(session, limit)]
 
 
+@router.delete("/search/runs", tags=["search"])
+def clear_runs(session: SessionDep) -> dict[str, int]:
+    """Verlauf leeren: Läufe werden ausgeblendet, nicht gelöscht (Auswertung bleibt möglich)."""
+    return {"hidden": search.hide_all_runs(session)}
+
+
+@router.delete("/search/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["search"])
+def delete_run(session: SessionDep, run_id: int) -> None:
+    search.hide_run(session, run_id)
+
+
 @router.get("/search/runs/{run_id}", response_model=SearchRunRead, tags=["search"])
 def get_run(session: SessionDep, run_id: int) -> SearchRunRead:
     return SearchRunRead.model_validate(search.get_run(session, run_id))
@@ -224,6 +235,13 @@ def list_profiles(session: SessionDep) -> list[SearchProfileRead]:
 )
 def create_profile(session: SessionDep, data: SearchProfileCreate) -> SearchProfileRead:
     return SearchProfileRead.model_validate(search.create_profile(session, data))
+
+
+@router.put("/search/profiles/{profile_id}", response_model=SearchProfileRead, tags=["search"])
+def put_search_profile(
+    session: SessionDep, profile_id: int, data: SearchProfileCreate
+) -> SearchProfileRead:
+    return SearchProfileRead.model_validate(search.update_profile(session, profile_id, data))
 
 
 @router.delete(

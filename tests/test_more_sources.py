@@ -153,6 +153,7 @@ def test_remotive_keeps_only_reachable_regions() -> None:
                     {
                         "id": 1,
                         "title": "Backend (EU)",
+                        "tags": ["Python"],
                         "candidate_required_location": "Europe",
                         "job_type": "full_time",
                         "url": "https://remotive.com/1",
@@ -168,10 +169,17 @@ def test_remotive_keeps_only_reachable_regions() -> None:
                     },
                     {
                         "id": 3,
-                        "title": "Part time anywhere",
+                        "title": "Part time anywhere (Python)",
                         "candidate_required_location": "Worldwide",
                         "job_type": "part_time",
                         "url": "https://remotive.com/3",
+                    },
+                    {
+                        "id": 4,
+                        "title": "Office Assistant",
+                        "candidate_required_location": "Worldwide",
+                        "job_type": "full_time",
+                        "description": "Passt nicht zum Suchbegriff",
                     },
                 ]
             },
