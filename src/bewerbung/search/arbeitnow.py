@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from bewerbung.domain.enums import WORK_TIME_LABEL, JobSource, RemoteType
+from bewerbung.domain.logos import logo_from_payload
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
 from bewerbung.search.common import clean_html, matches_all, parse_datetime, query_terms
 
@@ -38,6 +39,7 @@ def to_draft(item: dict[str, Any]) -> ListingDraft | None:
         url=item.get("url"),
         title=str(item["title"]).strip(),
         company_name=item.get("company_name"),
+        company_logo_url=logo_from_payload(item),
         location=item.get("location"),
         remote_type=RemoteType.REMOTE if item.get("remote") else RemoteType.UNKNOWN,
         employment_type=", ".join(job_types) or None,

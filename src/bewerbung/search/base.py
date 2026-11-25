@@ -31,6 +31,7 @@ class ListingDraft(BaseModel):
     url: str | None
     title: str
     company_name: str | None = None
+    company_logo_url: str | None = None
     location: str | None = None
     remote_type: RemoteType = RemoteType.UNKNOWN
     employment_type: str | None = None

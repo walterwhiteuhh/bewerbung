@@ -1,4 +1,5 @@
 import type { PostingListItem } from "../api/types";
+import { CompanyLogo } from "./CompanyLogo";
 import { formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
@@ -55,7 +56,10 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
                 <SourceTag source={p.source} />
               </div>
               <h3 className="card__title">{p.title}</h3>
-              <p className="card__company">{p.company?.name ?? "Firma unbekannt"}</p>
+              <p className="card__company">
+                <CompanyLogo name={p.company?.name} url={p.company?.logo_url} />
+                <span>{p.company?.name ?? "Firma unbekannt"}</span>
+              </p>
               <MetaLine items={[p.location, p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]} />
               <TagList tags={p.tags} active={activeTags} />
               <div className="card__bottom">

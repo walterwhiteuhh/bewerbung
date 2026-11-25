@@ -53,6 +53,7 @@ async def preview_import(
         method=extracted.method,
         title=extracted.title,
         company_name=extracted.company_name,
+        company_logo_url=extracted.company_logo_url,
         location=extracted.location,
         remote_type=extracted.remote_type,
         employment_type=extracted.employment_type,

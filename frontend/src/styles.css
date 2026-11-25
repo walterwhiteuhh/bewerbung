@@ -1165,3 +1165,34 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
 .recent__delete { align-self: center; color: var(--muted); }
 .recent__delete:hover { color: var(--danger); }
 .chip--split button[aria-label$="löschen"]:hover { color: var(--danger); }
+
+/* --- Firmenlogos --------------------------------------------------------- */
+.card__company { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.card__company > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logo {
+  --size: 22px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 6px;
+  overflow: hidden;
+  /* Logos sind meist für hellen Grund gestaltet, daher auch im Dunkelmodus weiß. */
+  background: #fff;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+.logo--md { --size: 40px; border-radius: 10px; }
+.logo--md img { padding: 4px; }
+.logo--mono {
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: calc(var(--size) * 0.42);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  box-shadow: none;
+}
+.detail__title-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.detail__title-row h2 { min-width: 0; }

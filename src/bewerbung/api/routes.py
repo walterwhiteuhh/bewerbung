@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from bewerbung.api.deps import (
+    AaLogosDep,
     DocumentStoreDep,
     FetcherDep,
     LetterGeneratorsDep,
@@ -71,6 +72,19 @@ router = APIRouter(prefix="/api")
 @router.get("/health", tags=["meta"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/logos/arbeitsagentur/{logo_hash}", tags=["search"], include_in_schema=False)
+async def arbeitsagentur_logo(cache: AaLogosDep, logo_hash: str) -> FileResponse:
+    """Arbeitgeberlogo der Arbeitsagentur (einmal geladen, dann lokal aus dem Cache)."""
+    logo = await cache.get(logo_hash)
+    if logo is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kein Logo")
+    return FileResponse(
+        logo.path,
+        media_type=logo.media_type,
+        headers={"Cache-Control": "public, max-age=604800", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/sources/detect", response_model=SourceDetection, tags=["sources"])

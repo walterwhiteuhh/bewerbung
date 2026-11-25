@@ -141,6 +141,16 @@ automatisch in die Anschreiben ein, falls im Profil kein Lebenslauf-Text steht (
 Die Dateien liegen inhaltsadressiert (SHA-256) im Ordner `documents` neben der Datenbank,
 also unter `data/documents/`. Ein Backup von `data/` enthält damit alles.
 
+### Firmenlogos
+
+Logos kommen aus den Daten, die ohnehin geladen werden: `hiringOrganization.logo` im JSON-LD
+importierter Anzeigen und Logo-Felder der Such-APIs (z. B. Remotive). Sie landen in
+`listings.company_logo_url` und, sobald eine Stelle gemerkt wird, in `companies.logo_url`.
+Arbeitsagentur-Logos brauchen den API-Key-Header; deshalb holt der Server sie über
+`/api/logos/arbeitsagentur/{hash}` einmal ab und legt sie in `data/logos/` ab (fehlende Logos
+werden eine Woche lang nicht erneut angefragt, SVG wird nicht angenommen). Ohne Logo zeigt die
+Oberfläche die Initialen der Firma. Migration 0008 trägt Logos aus vorhandenen Rohdaten nach.
+
 ### Neue Quelle anbinden
 
 ```python

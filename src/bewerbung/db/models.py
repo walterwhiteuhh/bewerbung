@@ -77,6 +77,8 @@ class Company(TimestampMixin, Base):
     # Normalisierter Schlüssel zum Zusammenführen ("SAP SE" vs. "sap se ").
     name_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     website: Mapped[str | None] = mapped_column(String(2048))
+    # Externe URL (Portal/Karriereseite) oder eigener Proxy-Pfad /api/logos/...
+    logo_url: Mapped[str | None] = mapped_column(String(2048))
 
     postings: Mapped[list[JobPosting]] = relationship(back_populates="company")
 
@@ -293,6 +295,7 @@ class Listing(TimestampMixin, Base):
 
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(255))
+    company_logo_url: Mapped[str | None] = mapped_column(String(2048))
     location: Mapped[str | None] = mapped_column(String(255))
     remote_type: Mapped[RemoteType] = mapped_column(
         _enum(RemoteType, "remote_type"), default=RemoteType.UNKNOWN, nullable=False

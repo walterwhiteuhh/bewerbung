@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from bewerbung.db.session import session_scope
 from bewerbung.letters.base import LetterGenerator
+from bewerbung.search.aa_logos import AaLogoCache
 from bewerbung.search.base import SearchProvider
 from bewerbung.services.documents import DocumentStore
 from bewerbung.sources import SourceRegistry
@@ -45,9 +46,15 @@ def get_document_store(request: Request) -> DocumentStore:
     return store
 
 
+def get_aa_logos(request: Request) -> AaLogoCache:
+    cache: AaLogoCache = request.app.state.aa_logos
+    return cache
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 RegistryDep = Annotated[SourceRegistry, Depends(get_registry)]
 FetcherDep = Annotated[PageFetcher, Depends(get_fetcher)]
 ProvidersDep = Annotated[list[SearchProvider], Depends(get_providers)]
 LetterGeneratorsDep = Annotated[dict[str, LetterGenerator], Depends(get_letter_generators)]
 DocumentStoreDep = Annotated[DocumentStore, Depends(get_document_store)]
+AaLogosDep = Annotated[AaLogoCache, Depends(get_aa_logos)]

@@ -42,6 +42,7 @@ export type SortField = "created_at" | "updated_at" | "status_changed_at" | "pri
 export interface Company {
   id: number;
   name: string;
+  logo_url: string | null;
 }
 
 export interface ApplicationSummary {
@@ -148,6 +149,7 @@ export interface ImportPreview {
   method: "json-ld" | "opengraph" | "none";
   title: string | null;
   company_name: string | null;
+  company_logo_url: string | null;
   location: string | null;
   remote_type: RemoteType;
   employment_type: string | null;
@@ -205,6 +207,7 @@ export interface Listing {
   url: string | null;
   title: string;
   company_name: string | null;
+  company_logo_url: string | null;
   location: string | null;
   remote_type: RemoteType;
   employment_type: string | null;

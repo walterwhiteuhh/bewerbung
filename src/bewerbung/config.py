@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     )
 
 
+def resolve_logos_dir(settings: Settings) -> Path:
+    """Zwischengespeicherte Logos liegen ebenfalls im Datenordner."""
+    return resolve_documents_dir(settings).parent / "logos"
+
+
 def resolve_documents_dir(settings: Settings) -> Path:
     """Uploads liegen neben der Datenbank, damit ein Backup des Datenordners alles enthält."""
     if settings.documents_dir is not None:
