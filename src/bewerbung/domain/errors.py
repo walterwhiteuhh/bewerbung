@@ -22,3 +22,7 @@ class DuplicatePostingError(DomainError):
 
 class InvalidTransitionError(DomainError):
     pass
+
+
+class LetterGenerationError(DomainError):
+    """Der Textgenerator (z. B. Claude-API) ist fehlgeschlagen."""

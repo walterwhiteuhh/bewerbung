@@ -7,6 +7,7 @@ import { EMPTY_EXTRA, FilterPanel, activeFilterCount } from "./components/Filter
 import { PostingDetail } from "./components/PostingDetail";
 import { PostingForm } from "./components/PostingForm";
 import { PostingList } from "./components/PostingList";
+import { ProfileForm } from "./components/ProfileForm";
 import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
 import { TagFilterBar } from "./components/TagInput";
@@ -31,6 +32,7 @@ export function App() {
   const [extra, setExtra] = useState(EMPTY_EXTRA);
   const [showFilters, setShowFilters] = useState(false);
   const [form, setForm] = useState<FormState>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [q, setQ] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -76,6 +78,16 @@ export function App() {
       </button>
     </nav>
   );
+  const profileButton = (
+    <button type="button" className="btn btn--ghost topbar__profile" onClick={() => setProfileOpen(true)}>
+      Mein Profil
+    </button>
+  );
+  const profileDialog = (
+    <Dialog open={profileOpen} title="Mein Profil" onClose={() => setProfileOpen(false)}>
+      <ProfileForm onDone={() => setProfileOpen(false)} />
+    </Dialog>
+  );
 
   if (view === "search") {
     return (
@@ -84,6 +96,7 @@ export function App() {
           <div className="topbar__inner topbar__inner--search">
             <Brand />
             {tabs}
+            {profileButton}
           </div>
         </header>
         <div className="band band--search">
@@ -95,6 +108,7 @@ export function App() {
         <div className="app">
           <SearchView onOpenPosting={select} />
         </div>
+        {profileDialog}
       </div>
     );
   }
@@ -113,6 +127,7 @@ export function App() {
             </svg>
             <input type="search" placeholder="Titel, Firma, Ort oder #hashtag …" value={q} onChange={(e) => setQ(e.target.value)} />
           </label>
+          {profileButton}
           <button type="button" className="btn btn--primary topbar__new" onClick={() => setForm({ mode: "create" })}>
             Neue Stelle
           </button>
@@ -178,6 +193,7 @@ export function App() {
               onClose={() => select(null)}
               onEdit={(posting) => setForm({ mode: "edit", posting })}
               showClose={!isWide}
+              onOpenProfile={() => setProfileOpen(true)}
             />
           ) : (
             <div className="empty empty--detail">
@@ -206,6 +222,7 @@ export function App() {
           />
         )}
       </Dialog>
+      {profileDialog}
     </div>
   );
 }

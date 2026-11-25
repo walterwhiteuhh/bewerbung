@@ -11,6 +11,7 @@ from bewerbung.domain.errors import (
     DomainError,
     DuplicatePostingError,
     InvalidTransitionError,
+    LetterGenerationError,
     NotFoundError,
 )
 from bewerbung.sources.fetcher import FetchError
@@ -38,6 +39,10 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(FetchError)
     async def _fetch(_: Request, exc: FetchError) -> JSONResponse:
         logger.info("Import fehlgeschlagen: %s", exc)
+        return _error(status.HTTP_502_BAD_GATEWAY, str(exc))
+
+    @app.exception_handler(LetterGenerationError)
+    async def _letter(_: Request, exc: LetterGenerationError) -> JSONResponse:
         return _error(status.HTTP_502_BAD_GATEWAY, str(exc))
 
     @app.exception_handler(DomainError)

@@ -75,6 +75,9 @@ class ImportPreview(_Schema):
     raw_payload: dict[str, Any] = Field(
         description="Rohdaten plus Metadaten (fetched_at, extractor); beim Anlegen mitsenden"
     )
+    suggested_tags: list[str] = Field(
+        default_factory=list, description="Aus Titel/Beschreibung erkannte Hashtags"
+    )
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -362,3 +365,83 @@ class SaveListing(_Schema):
     initial_status: ApplicationStatus = ApplicationStatus.SAVED
     priority: Priority = 3
     tags: TagList = Field(default_factory=list)
+
+
+# --- Profil & Anschreiben ----------------------------------------------------
+
+
+class ProfileRead(_Schema):
+    full_name: str | None
+    email: str | None
+    phone: str | None
+    address: str | None
+    headline: str | None
+    summary: str | None
+    skills: list[str]
+    cv_text: str | None
+    signature: str | None
+    updated_at: datetime | None = None
+
+
+class ProfileUpdate(_Schema):
+    full_name: OptStr = Field(default=None, max_length=255)
+    email: OptStr = Field(default=None, max_length=255)
+    phone: OptStr = Field(default=None, max_length=64)
+    address: OptStr = Field(default=None, max_length=500)
+    headline: OptStr = Field(default=None, max_length=255)
+    summary: OptStr = Field(default=None, max_length=10_000)
+    skills: list[Annotated[str, Field(min_length=1, max_length=60)]] = Field(
+        default_factory=list, max_length=60
+    )
+    cv_text: OptStr = Field(default=None, max_length=50_000)
+    signature: OptStr = Field(default=None, max_length=1_000)
+
+
+GeneratorName = Literal["claude", "openai", "gemini", "template"]
+
+
+class GeneratorInfo(_Schema):
+    name: GeneratorName
+    label: str
+    available: bool
+    reason: str | None = None
+    model: str | None = None
+
+
+class CoverLetterRequest(_Schema):
+    generator: Literal["auto"] | GeneratorName = "auto"
+    tone: Literal["formell", "modern", "locker"] = "modern"
+    length: Literal["kurz", "normal", "ausfuehrlich"] = "normal"
+    extra_notes: OptStr = Field(default=None, max_length=4_000)
+
+
+class CoverLetterUpdate(_Schema):
+    body: str | None = Field(default=None, min_length=1, max_length=20_000)
+    status: Literal["draft", "final"] | None = None
+
+
+class CoverLetterRead(_Schema):
+    id: int
+    posting_id: int
+    version: int
+    status: str
+    body: str
+    edited: bool
+    generator: str
+    model: str | None
+    tone: str
+    input_snapshot: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class LetterContextPreview(_Schema):
+    """Was automatisch erkannt wurde, bevor ein Anschreiben erzeugt wird."""
+
+    portal: str | None
+    tags: list[str]
+    suggested_tags: list[str]
+    description_excerpt: str | None
+    matching_skills: list[str]
+    profile_complete: bool
+    missing_profile_fields: list[str]

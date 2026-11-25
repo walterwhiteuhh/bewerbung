@@ -17,6 +17,8 @@ from bewerbung.api.routes import router
 from bewerbung.config import Settings, get_settings
 from bewerbung.db.migrate import upgrade_to_head
 from bewerbung.db.session import build_engine, build_session_factory
+from bewerbung.letters.base import LetterGenerator
+from bewerbung.letters.registry import build_generators
 from bewerbung.logging_config import configure_logging
 from bewerbung.search.base import SearchProvider
 from bewerbung.search.providers import build_providers
@@ -32,6 +34,7 @@ def create_app(
     settings: Settings | None = None,
     page_fetcher: PageFetcher | None = None,
     search_providers: list[SearchProvider] | None = None,
+    letter_generators: dict[str, LetterGenerator] | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -52,6 +55,9 @@ def create_app(
         search_providers if search_providers is not None else build_providers(settings)
     )
     app.state.page_fetcher = page_fetcher or HttpPageFetcher(timeout=settings.fetch_timeout)
+    app.state.letter_generators = (
+        letter_generators if letter_generators is not None else build_generators(settings)
+    )
 
     register_error_handlers(app)
     app.include_router(router)

@@ -15,6 +15,11 @@ import type {
   Stats,
   ApplicationStatus,
   TagCount,
+  CoverLetter,
+  GeneratorInfo,
+  LetterContext,
+  LetterRequest,
+  Profile,
 } from "./types";
 
 export class ApiError extends Error {
@@ -98,4 +103,13 @@ export const api = {
   },
   saveListing: (id: number, priority = 3) =>
     request<PostingDetail>(`/listings/${id}/save`, json("POST", { priority })),
+  profile: () => request<Profile>("/profile"),
+  saveProfile: (p: Omit<Profile, "updated_at">) => request<Profile>("/profile", json("PUT", p)),
+  generators: () => request<GeneratorInfo[]>("/letters/generators"),
+  letterContext: (postingId: number) => request<LetterContext>(`/postings/${postingId}/letter-context`),
+  letters: (postingId: number) => request<CoverLetter[]>(`/postings/${postingId}/letters`),
+  generateLetter: (postingId: number, r: LetterRequest) =>
+    request<CoverLetter>(`/postings/${postingId}/letters`, json("POST", r)),
+  updateLetter: (id: number, data: Partial<Pick<CoverLetter, "body" | "status">>) =>
+    request<CoverLetter>(`/letters/${id}`, json("PATCH", data)),
 };

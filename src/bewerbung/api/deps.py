@@ -9,6 +9,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from bewerbung.db.session import session_scope
+from bewerbung.letters.base import LetterGenerator
 from bewerbung.search.base import SearchProvider
 from bewerbung.sources import SourceRegistry
 from bewerbung.sources.fetcher import PageFetcher
@@ -33,7 +34,13 @@ def get_providers(request: Request) -> list[SearchProvider]:
     return providers
 
 
+def get_letter_generators(request: Request) -> dict[str, LetterGenerator]:
+    generators: dict[str, LetterGenerator] = request.app.state.letter_generators
+    return generators
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 RegistryDep = Annotated[SourceRegistry, Depends(get_registry)]
 FetcherDep = Annotated[PageFetcher, Depends(get_fetcher)]
 ProvidersDep = Annotated[list[SearchProvider], Depends(get_providers)]
+LetterGeneratorsDep = Annotated[dict[str, LetterGenerator], Depends(get_letter_generators)]

@@ -5,10 +5,11 @@ interface Props {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  wide?: boolean;
 }
 
 /** Natives <dialog>: Fokusfalle und Escape gibt es gratis. Auf dem Handy als Vollbild. */
-export function Dialog({ open, title, onClose, children }: Props) {
+export function Dialog({ open, title, onClose, children, wide = false }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -21,14 +22,14 @@ export function Dialog({ open, title, onClose, children }: Props) {
   return (
     <dialog
       ref={ref}
-      className="dialog"
+      className={`dialog ${wide ? "dialog--wide" : ""}`}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      aria-labelledby="dialog-title"
+      aria-label={title}
     >
       <div className="dialog__inner">
         <header className="dialog__head">
-          <h2 id="dialog-title">{title}</h2>
+          <h2>{title}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Schließen">
             ✕
           </button>

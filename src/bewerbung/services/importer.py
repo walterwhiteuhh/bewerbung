@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from bewerbung.db.types import utcnow
+from bewerbung.domain.keywords import suggest_tags
 from bewerbung.domain.schemas import ImportPreview
 from bewerbung.services.postings import detect_source
 from bewerbung.sources import SourceRegistry
@@ -66,5 +67,12 @@ async def preview_import(
             "extractor": {"method": extracted.method, "version": EXTRACTOR_VERSION},
             **extracted.raw,
         },
+        suggested_tags=suggest_tags(
+            title=extracted.title,
+            description=description,
+            location=extracted.location,
+            remote_type=extracted.remote_type,
+            employment_type=extracted.employment_type,
+        ),
         warnings=warnings,
     )
