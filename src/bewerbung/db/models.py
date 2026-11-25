@@ -85,6 +85,8 @@ class Company(TimestampMixin, Base):
     # Herkunft des Logos: portal | website | manual; erlaubt späteres gezieltes Neuladen.
     logo_source: Mapped[str | None] = mapped_column(String(16))
     logo_fetched_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # {netz: profil_url}, z. B. {"linkedin": "https://www.linkedin.com/company/acme"}.
+    social_links: Mapped[dict[str, str] | None] = mapped_column(JSON)
 
     postings: Mapped[list[JobPosting]] = relationship(back_populates="company")
 

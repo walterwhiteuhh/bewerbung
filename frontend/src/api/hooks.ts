@@ -33,8 +33,8 @@ export const useLetters = (postingId: number) =>
 export const useLetterContext = (postingId: number) =>
   useQuery({ queryKey: keys.letterContext(postingId), queryFn: () => api.letterContext(postingId) });
 
-export const usePostingInsights = (postingId: number) =>
-  useQuery({ queryKey: ["posting-insights", postingId], queryFn: () => api.postingInsights(postingId) });
+export const usePostingInsights = (postingId: number, enabled = true) =>
+  useQuery({ queryKey: ["posting-insights", postingId], queryFn: () => api.postingInsights(postingId), enabled });
 
 export const useDocuments = () => useQuery({ queryKey: keys.documents, queryFn: api.documents });
 export const usePostingDocuments = (postingId: number) =>

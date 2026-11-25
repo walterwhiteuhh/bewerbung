@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, selectinload
 from bewerbung.db.models import (
     ApplicantProfile,
     Application,
+    Company,
     JobPosting,
     Listing,
     SearchHit,
@@ -157,17 +158,36 @@ def _match(
     return round(len(have) / len(job), 2), sorted(have), sorted(job - ctx.skills)
 
 
-def _distance(
+def _position(
     ctx: Context, city: str | None, lat: float | None, lon: float | None
-) -> tuple[float | None, bool]:
-    if ctx.home is None:
-        return None, False
+) -> tuple[tuple[float, float] | None, bool]:
+    """Eigene Koordinaten, sonst Stadtmitte aus anderen Anzeigen (geschätzt)."""
     if lat is not None and lon is not None:
-        return haversine_km(*ctx.home, lat, lon), False
+        return (lat, lon), False
     key = city_key(city)
     if key and key in ctx.city_centers:
-        return haversine_km(*ctx.home, *ctx.city_centers[key]), True
+        return ctx.city_centers[key], True
     return None, False
+
+
+def _place_fields(
+    ctx: Context, city: str | None, lat: float | None, lon: float | None
+) -> dict[str, Any]:
+    point, estimated = _position(ctx, city, lat, lon)
+    distance = haversine_km(*ctx.home, *point) if ctx.home and point else None
+    return {
+        "city": city,
+        "lat": point[0] if point else None,
+        "lon": point[1] if point else None,
+        "position_estimated": estimated,
+        "distance_km": distance,
+        "distance_estimated": estimated and distance is not None,
+        "within_max_distance": (
+            distance <= ctx.max_distance_km
+            if distance is not None and ctx.max_distance_km
+            else None
+        ),
+    }
 
 
 def _company_activity(
@@ -209,12 +229,15 @@ def _company_activity(
         applied[cid] += status in _APPLIED
         rejected[cid] += status is ApplicationStatus.REJECTED
         last[cid] = status.value
+    master = {c.id: c for c in session.scalars(select(Company).where(Company.id.in_(company_ids)))}
     return {
         cid: CompanyActivity(
             company_id=cid,
             listings=s["listings"],
             active_listings=s["active"],
             portals=sorted(s["portals"], key=str),
+            website=master[cid].website if cid in master else None,
+            social_links=(master[cid].social_links or {}) if cid in master else {},
             saved_postings=saved[cid],
             applications=applied[cid],
             rejections=rejected[cid],
@@ -308,19 +331,12 @@ def listing_features(
     out: dict[int, JobFeatures] = {}
     for lst in listings:
         group = siblings.get((lst.company_id, lst.title_key), [lst])  # type: ignore[arg-type]
-        distance, estimated = _distance(ctx, lst.city, lst.lat, lst.lon)
         score, have, missing = _match(ctx, lst.title, lst.description)
         reference = lst.posted_at or lst.first_seen_at
         out[lst.id] = JobFeatures(
-            city=lst.city,
+            **_place_fields(ctx, lst.city, lst.lat, lst.lon),
+            postal_code=lst.postal_code,
             region=lst.region,
-            distance_km=distance,
-            distance_estimated=estimated,
-            within_max_distance=(
-                distance <= ctx.max_distance_km
-                if distance is not None and ctx.max_distance_km
-                else None
-            ),
             age_days=max((ctx.now - reference).days, 0) if reference else None,
             days_online=(lst.last_seen_at - lst.first_seen_at).days,
             times_seen=int(seen_counts.get(lst.id, 0)),
@@ -352,20 +368,13 @@ def posting_insights(session: Session, posting_id: int) -> PostingInsights:
         features = listing_features(session, own[:1], ctx)[own[0].id]
     else:  # manuell erfasst: Merkmale aus der Stelle selbst
         place = place_from_text(posting.location)
-        distance, estimated = _distance(ctx, place.city, None, None)
         score, have, missing = _match(ctx, posting.title, posting.description)
         companies = _company_activity(
             session, {posting.company_id} if posting.company_id else set(), ctx.now
         )
         features = JobFeatures(
-            city=place.city,
-            distance_km=distance,
-            distance_estimated=estimated,
-            within_max_distance=(
-                distance <= ctx.max_distance_km
-                if distance is not None and ctx.max_distance_km
-                else None
-            ),
+            **_place_fields(ctx, place.city, None, None),
+            postal_code=place.postal_code,
             age_days=(ctx.now - (posting.posted_at or posting.created_at)).days,
             match_score=score,
             matched_skills=have,

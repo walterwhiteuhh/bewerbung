@@ -1281,3 +1281,114 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
 .rel__score { font-size: 0.78rem; font-weight: 700; color: var(--accent); min-width: 3.2em; }
 .results__tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .results__tools select { min-height: 34px; padding: 4px 8px; border-radius: var(--radius-sm); }
+
+/* --- Ort mit Info-Karte ------------------------------------------------------ */
+.placehover {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: help;
+  border-radius: 6px;
+  text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+}
+.placehover:hover, .placehover.is-open { color: var(--accent); text-decoration-color: currentColor; }
+.placehover:focus-visible { outline-offset: 2px; }
+.placehover__pin { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
+
+.placecard {
+  position: fixed;
+  z-index: 60;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 44px -12px rgb(12 18 36 / 0.38), 0 2px 6px rgb(12 18 36 / 0.08);
+  font-size: 0.88rem;
+  text-align: left;
+  animation: placecard-in 0.16s ease-out;
+}
+.placecard.is-above { animation-name: placecard-in-above; }
+@keyframes placecard-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes placecard-in-above { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .placecard { animation: none; } }
+
+.minimap {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  background: repeating-linear-gradient(45deg, var(--surface-2) 0 8px, var(--bg) 8px 16px);
+}
+.minimap__tile { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; }
+@media (prefers-color-scheme: dark) { .minimap__tile { filter: brightness(0.78) contrast(1.08) saturate(0.8); } }
+.minimap__overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.minimap__route { stroke: var(--band); stroke-width: 2.5; stroke-dasharray: 2 6; stroke-linecap: round; }
+.minimap__area { fill: color-mix(in srgb, var(--accent) 16%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.minimap__job path { fill: var(--marker); stroke: var(--band); stroke-width: 2; }
+.minimap__job circle { fill: var(--band); }
+.minimap__home circle { fill: var(--band); stroke: #fff; stroke-width: 2; }
+.minimap__home path { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.minimap__credit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 1px 6px;
+  font-size: 0.66rem;
+  color: #333;
+  background: rgb(255 255 255 / 0.78);
+  border-top-left-radius: 6px;
+}
+.minimap--empty { display: grid; place-items: center; height: 84px; padding: 0 16px; color: var(--muted); text-align: center; }
+
+.placecard__body { display: grid; gap: 8px; padding: 12px 14px 14px; }
+.placecard__place { font-size: 0.98rem; }
+.placecard__place strong { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.01em; }
+.placecard__dist { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.placecard__dist .feat { list-style: none; }
+.placecard__hint { font-size: 0.8rem; }
+.placecard__company {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.placecard__company > div { display: grid; gap: 1px; min-width: 0; }
+.placecard__company strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.placecard__company .muted { font-size: 0.8rem; }
+.placecard__links { display: flex; gap: 14px; font-weight: 600; }
+.placecard__links a { color: var(--accent); text-decoration: none; }
+.placecard__links a:hover { text-decoration: underline; }
+
+/* --- Social-Media-Links ------------------------------------------------------ */
+.socials { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0; list-style: none; }
+.social {
+  --c: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--c) 35%, var(--border));
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+}
+.social::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.social:hover { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, var(--surface)); }
+.social--web { --c: var(--accent); }
+.social--linkedin { --c: #0a66c2; }
+.social--xing { --c: #00a39a; }
+.social--kununu { --c: #ffb400; }
+.social--instagram { --c: #d62976; }
+.social--facebook { --c: #1877f2; }
+.social--youtube { --c: #ff0000; }
+.social--x { --c: #6b7280; }
+.social--tiktok { --c: #25c2c9; }
+.social--github { --c: #6e5494; }
+.company .socials { margin: 2px 0 10px; }
+.facts--one { grid-template-columns: 1fr; }

@@ -6,7 +6,7 @@ import { SourceTag } from "./Badges";
 
 const pct = (x: number) => `${Math.round(x * 100)} %`;
 
-function distanceLabel(f: JobFeatures): string | null {
+export function distanceLabel(f: JobFeatures): string | null {
   if (f.distance_km === null) return null;
   const km = f.distance_km < 10 ? f.distance_km.toFixed(1).replace(".", ",") : Math.round(f.distance_km).toString();
   return `${f.distance_estimated ? "ca. " : ""}${km} km`;

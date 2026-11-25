@@ -8,6 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bewerbung.config import Settings
+from bewerbung.domain.socials import (
+    classify_social,
+    merge_socials,
+    socials_from_html,
+    socials_from_payload,
+)
 from bewerbung.domain.websites import normalize_website, website_from_payload
 from bewerbung.main import create_app
 from bewerbung.sources.fetcher import FetchError
@@ -35,6 +41,8 @@ def test_normalize_website(value: str, expected: str | None) -> None:
 def test_website_from_payload_skips_portals() -> None:
     org = {"name": "ACME", "sameAs": "https://www.acme.de", "url": "https://acme.personio.de"}
     assert website_from_payload({"json_ld": {"hiringOrganization": org}}) == "https://www.acme.de"
+    social_only = {"hiringOrganization": {"sameAs": ["https://www.instagram.com/acme"]}}
+    assert website_from_payload(social_only) is None
     portal_only = {"hiringOrganization": {"url": "https://www.stepstone.de/cmp/acme"}}
     assert website_from_payload(portal_only) is None
 
@@ -161,3 +169,104 @@ def test_import_sets_company_website(client: TestClient) -> None:
         "/api/postings", json={"title": "Dev", "company_name": "ACME", "raw_payload": payload}
     ).json()
     assert posting["company"]["website"] == "https://acme.de"
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        (
+            "https://de.linkedin.com/company/acme-gmbh/jobs/",
+            ("linkedin", "https://www.linkedin.com/company/acme-gmbh"),
+        ),
+        ("https://www.xing.com/pages/acme", ("xing", "https://www.xing.com/pages/acme")),
+        ("https://www.kununu.com/de/acme/kommentare", ("kununu", "https://www.kununu.com/de/acme")),
+        ("https://twitter.com/acme_de?lang=de", ("x", "https://x.com/acme_de")),
+        ("instagram.com/acme.hamburg/", ("instagram", "https://www.instagram.com/acme.hamburg")),
+        ("https://www.youtube.com/@acme", ("youtube", "https://www.youtube.com/@acme")),
+        ("https://www.facebook.com/sharer/sharer.php?u=x", None),
+        ("https://twitter.com/intent/tweet?text=x", None),
+        ("https://www.linkedin.com/in/max-mustermann", None),
+        ("https://acme.de/linkedin", None),
+    ],
+)
+def test_classify_social(url: str, expected: tuple[str, str] | None) -> None:
+    assert classify_social(url) == expected
+
+
+def test_socials_from_payload_and_html() -> None:
+    org = {
+        "sameAs": ["https://acme.de", "https://www.linkedin.com/company/acme", "https://x.com/acme"]
+    }
+    assert socials_from_payload({"json_ld": {"hiringOrganization": org}}) == {
+        "linkedin": "https://www.linkedin.com/company/acme",
+        "x": "https://x.com/acme",
+    }
+    html = """<footer>
+      <a href="https://www.instagram.com/acme/">Insta</a>
+      <a href="https://www.facebook.com/sharer.php?u=1">teilen</a>
+      <a href="//www.xing.com/pages/acme">XING</a>
+      <a href="https://www.instagram.com/p/abc123/">Beitrag</a>
+    </footer>"""
+    assert socials_from_html(html, "https://acme.de/") == {
+        "xing": "https://www.xing.com/pages/acme",
+        "instagram": "https://www.instagram.com/acme",
+    }
+    assert merge_socials(
+        {"x": "https://x.com/alt"}, {"x": "https://x.com/neu", "github": "https://github.com/acme"}
+    ) == {
+        "x": "https://x.com/alt",
+        "github": "https://github.com/acme",
+    }
+
+
+def test_website_fetch_collects_socials(settings: Settings) -> None:
+    fetcher = _site(
+        {
+            "https://acme.de": httpx.Response(
+                200,
+                text='<link rel="icon" href="/l.png"><a href="https://www.linkedin.com/company/acme">in</a>',
+            ),
+            "https://acme.de/l.png": httpx.Response(200, content=PNG),
+            "https://ohne-logo.de": httpx.Response(
+                200, text='<a href="https://www.kununu.com/de/beta">k</a>'
+            ),
+        }
+    )
+    with TestClient(create_app(settings, site_logos=fetcher)) as c:
+        payload = {
+            "json_ld": {"hiringOrganization": {"name": "ACME", "sameAs": ["https://x.com/acme"]}}
+        }
+        posting = c.post(
+            "/api/postings", json={"title": "Dev", "company_name": "ACME", "raw_payload": payload}
+        ).json()
+        cid = posting["company"]["id"]
+        assert posting["company"]["social_links"] == {"x": "https://x.com/acme"}
+
+        c.patch(f"/api/companies/{cid}", json={"website": "acme.de"})
+        body = c.post(f"/api/companies/{cid}/logo").json()
+        assert body["social_links"] == {
+            "linkedin": "https://www.linkedin.com/company/acme",
+            "x": "https://x.com/acme",
+        }
+        assert body["logo_source"] == "website"
+
+        # Ohne Logo, aber mit Profil: kein Fehler, Profile werden übernommen.
+        beta = c.post("/api/postings", json={"title": "Ops", "company_name": "Beta"}).json()[
+            "company"
+        ]["id"]
+        c.patch(f"/api/companies/{beta}", json={"website": "ohne-logo.de"})
+        resp = c.post(f"/api/companies/{beta}/logo")
+        assert resp.status_code == 200 and resp.json()["social_links"] == {
+            "kununu": "https://www.kununu.com/de/beta"
+        }
+
+        manual = c.patch(
+            f"/api/companies/{cid}", json={"social_links": ["xing.com/pages/acme", ""]}
+        ).json()
+        assert manual["social_links"] == {"xing": "https://www.xing.com/pages/acme"}
+        bad = c.patch(f"/api/companies/{cid}", json={"social_links": ["https://acme.de/blog"]})
+        assert bad.status_code == 400
+
+        ins = c.get(f"/api/postings/{posting['id']}/insights").json()
+        assert ins["features"]["company"]["social_links"] == manual["social_links"]
+        assert ins["features"]["company"]["website"] == "https://acme.de"

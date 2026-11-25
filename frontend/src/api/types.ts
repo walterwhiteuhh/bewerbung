@@ -47,8 +47,12 @@ export interface Company {
   industry: string | null;
   location: string | null;
   logo_source: "portal" | "website" | "manual" | null;
+  social_links: SocialLinks;
   posting_count?: number | null;
 }
+
+export type SocialNetwork = "linkedin" | "xing" | "kununu" | "instagram" | "facebook" | "youtube" | "x" | "tiktok" | "github";
+export type SocialLinks = Partial<Record<SocialNetwork, string>>;
 
 export interface CompanyUpdate {
   name?: string;
@@ -56,6 +60,7 @@ export interface CompanyUpdate {
   industry?: string | null;
   location?: string | null;
   logo_url?: string | null;
+  social_links?: string[] | null;
 }
 
 export interface ApplicationSummary {
@@ -245,6 +250,8 @@ export interface CompanyActivity {
   listings: number;
   active_listings: number;
   portals: JobSource[];
+  website: string | null;
+  social_links: SocialLinks;
   saved_postings: number;
   applications: number;
   rejections: number;
@@ -262,7 +269,11 @@ export interface SimilarJob {
 
 export interface JobFeatures {
   city: string | null;
+  postal_code: string | null;
   region: string | null;
+  lat: number | null;
+  lon: number | null;
+  position_estimated: boolean;
   distance_km: number | null;
   distance_estimated: boolean;
   within_max_distance: boolean | null;
@@ -361,6 +372,8 @@ export interface Profile {
   signature: string | null;
   home_location: string | null;
   home_located?: boolean;
+  home_lat?: number | null;
+  home_lon?: number | null;
   max_distance_km: number | null;
   updated_at?: string | null;
 }

@@ -11,13 +11,14 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
 import httpx
 
+from bewerbung.domain.socials import socials_from_html
 from bewerbung.sources.fetcher import USER_AGENT, FetchError, assert_public_host
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,12 @@ class LogoStore:
         return path if path.is_file() else None
 
 
+@dataclass(frozen=True, slots=True)
+class SiteInfo:
+    logo: bytes | None
+    socials: dict[str, str] = field(default_factory=dict)
+
+
 class SiteLogoFetcher:
     def __init__(
         self,
@@ -141,6 +148,13 @@ class SiteLogoFetcher:
 
     async def fetch_logo(self, website: str) -> bytes:
         """Bestes Logo der Website als Bytes; FetchError mit Nutzerhinweis, wenn keins da ist."""
+        site = await self.fetch_site(website)
+        if site.logo is None:
+            raise FetchError("Auf der Website wurde kein Logo gefunden")
+        return site.logo
+
+    async def fetch_site(self, website: str) -> SiteInfo:
+        """Startseite einmal laden: Logo (falls vorhanden) und Social-Media-Profile."""
         async with httpx.AsyncClient(
             timeout=self._timeout,
             headers={"User-Agent": USER_AGENT, "Accept-Language": "de-DE,de;q=0.9"},
@@ -151,8 +165,9 @@ class SiteLogoFetcher:
                 final_url, page = await self._get(client, website, MAX_PAGE_BYTES)
             except FetchError:
                 final_url, page = website, b""  # Standardpfade trotzdem versuchen
-            candidates = icon_candidates(page.decode("utf-8", errors="replace"), final_url)
-            for url in candidates[:MAX_IMAGE_TRIES]:
+            html = page.decode("utf-8", errors="replace")
+            socials = socials_from_html(html, final_url)
+            for url in icon_candidates(html, final_url)[:MAX_IMAGE_TRIES]:
                 try:
                     _, data = await self._get(client, url, MAX_IMAGE_BYTES)
                 except FetchError as exc:
@@ -160,8 +175,8 @@ class SiteLogoFetcher:
                     continue
                 if sniff_image(data) is not None:
                     logger.info("Logo gefunden: %s (%d Bytes)", url, len(data))
-                    return data
-        raise FetchError("Auf der Website wurde kein Logo gefunden")
+                    return SiteInfo(logo=data, socials=socials)
+        return SiteInfo(logo=None, socials=socials)
 
     async def _get(self, client: httpx.AsyncClient, url: str, limit: int) -> tuple[str, bytes]:
         current = url

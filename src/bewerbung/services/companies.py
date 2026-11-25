@@ -13,8 +13,13 @@ from bewerbung.domain.geo import place_from_payload
 from bewerbung.domain.logos import clean_logo_url
 from bewerbung.domain.matching import company_key, title_key
 from bewerbung.domain.schemas import CompanyRead, CompanyUpdate
+from bewerbung.domain.socials import (
+    classify_social,
+    merge_socials,
+    order_socials,
+    socials_from_payload,
+)
 from bewerbung.domain.websites import normalize_website, website_from_payload
-from bewerbung.sources.fetcher import FetchError
 from bewerbung.sources.site_logo import LogoStore, SiteLogoFetcher
 
 logger = logging.getLogger(__name__)
@@ -55,6 +60,10 @@ def enrich_from_posting(company: Company, logo_url: str | None, raw_payload: Any
         company.logo_source = "portal"
     if not company.website and (site := website_from_payload(raw_payload)):
         company.website = site
+    if socials := socials_from_payload(raw_payload):
+        merged = merge_socials(company.social_links, socials)
+        if merged != (company.social_links or {}):
+            company.social_links = merged
 
 
 def get_company(session: Session, company_id: int) -> Company:
@@ -105,26 +114,49 @@ def update_company(session: Session, company_id: int, data: CompanyUpdate) -> Co
             raise DomainError("Logo-Adresse muss mit https:// beginnen")
         company.logo_url = logo
         company.logo_source = "manual" if company.logo_url else None
+    if "social_links" in changes:
+        company.social_links = _manual_socials(changes.pop("social_links") or []) or None
     for field, value in changes.items():
         setattr(company, field, value)
     session.flush()
     return company
 
 
+def _manual_socials(urls: list[str]) -> dict[str, str]:
+    links: dict[str, str] = {}
+    for url in filter(None, (u.strip() for u in urls)):
+        hit = classify_social(url)
+        if hit is None:
+            raise DomainError(
+                f"„{url}“ ist kein erkanntes Profil (LinkedIn, XING, kununu, Instagram, "
+                "Facebook, YouTube, X, TikTok, GitHub)"
+            )
+        links[hit[0]] = hit[1]
+    return order_socials(links)
+
+
 async def fetch_logo_from_website(
     session: Session, store: LogoStore, fetcher: SiteLogoFetcher, company_id: int
 ) -> Company:
+    """Logo und Social-Media-Profile von der Firmen-Website übernehmen."""
     company = get_company(session, company_id)
     if not company.website:
         raise DomainError("Für diese Firma ist keine Website hinterlegt")
+    site = await fetcher.fetch_site(company.website)
+    if site.socials:
+        company.social_links = merge_socials(company.social_links, site.socials)
+    if site.logo is None:
+        if not site.socials:
+            raise DomainError("Logo nicht gefunden: Auf der Website wurde kein Logo gefunden")
+        session.flush()
+        return company
     try:
-        data = await fetcher.fetch_logo(company.website)
-        stored = store.save(data)
-    except (FetchError, ValueError) as exc:
+        stored = store.save(site.logo)
+    except ValueError as exc:
         raise DomainError(f"Logo nicht gefunden: {exc}") from exc
     company.logo_url = LOGO_FILES_PATH.format(name=stored.name)
     company.logo_source = "website"
     company.logo_fetched_at = utcnow()
     session.flush()
-    logger.info("Logo für Firma %s von %s geladen", company.id, company.website)
+    logger.info("Website von Firma %s ausgewertet: Logo, %d Profile", company.id, len(site.socials))
     return company
