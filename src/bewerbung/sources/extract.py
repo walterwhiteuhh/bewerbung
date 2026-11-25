@@ -21,6 +21,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from bewerbung.domain.enums import RemoteType
+from bewerbung.domain.logos import logo_from_payload
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ _PERIOD_FACTOR = {"YEAR": 1, "MONTH": 12, "WEEK": 52}
 class ExtractedPosting(BaseModel):
     title: str | None = None
     company_name: str | None = None
+    company_logo_url: str | None = None
     location: str | None = None
     remote_type: RemoteType = RemoteType.UNKNOWN
     employment_type: str | None = None
@@ -257,6 +259,7 @@ def _from_json_ld(node: dict[str, Any]) -> ExtractedPosting:
     return ExtractedPosting(
         title=_text(node.get("title")) or _text(node.get("name")),
         company_name=_text(node.get("hiringOrganization")),
+        company_logo_url=logo_from_payload(node),
         location=location,
         remote_type=_remote(node, location),
         employment_type=_employment(node),

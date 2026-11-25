@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { CompanyLogo } from "./CompanyLogo";
 
 import { api } from "../api/client";
 import { useLetters, useMutate, usePosting } from "../api/hooks";
@@ -45,7 +46,10 @@ export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }:
             <SourceTag source={p.source} />
             {p.archived_at && <span className="tag">Archiviert</span>}
           </div>
-          <h2>{p.title}</h2>
+          <div className="detail__title-row">
+            {p.company && <CompanyLogo name={p.company.name} url={p.company.logo_url} size="md" />}
+            <h2>{p.title}</h2>
+          </div>
           <MetaLine className="detail__sub" items={[p.company?.name, p.location]} />
         </div>
         <div className="detail__actions">

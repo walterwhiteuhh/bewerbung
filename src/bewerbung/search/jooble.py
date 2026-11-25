@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from bewerbung.domain.enums import JobSource
+from bewerbung.domain.logos import logo_from_payload
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
 from bewerbung.search.common import clean_html, parse_datetime
 
@@ -34,6 +35,7 @@ def to_draft(item: dict[str, Any]) -> ListingDraft | None:
         url=str(link),
         title=clean_html(title) or str(title),
         company_name=(item.get("company") or None),
+        company_logo_url=logo_from_payload(item),
         location=(item.get("location") or None),
         employment_type=_TYPES.get(job_type.casefold(), job_type or None),
         description=clean_html(item.get("snippet")),

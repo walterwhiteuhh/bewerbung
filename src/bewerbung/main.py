@@ -14,12 +14,18 @@ from fastapi.staticfiles import StaticFiles
 from bewerbung import __version__
 from bewerbung.api.errors import register_error_handlers
 from bewerbung.api.routes import router
-from bewerbung.config import Settings, get_settings, resolve_documents_dir
+from bewerbung.config import (
+    Settings,
+    get_settings,
+    resolve_documents_dir,
+    resolve_logos_dir,
+)
 from bewerbung.db.migrate import upgrade_to_head
 from bewerbung.db.session import build_engine, build_session_factory
 from bewerbung.letters.base import LetterGenerator
 from bewerbung.letters.registry import build_generators
 from bewerbung.logging_config import configure_logging
+from bewerbung.search.aa_logos import AaLogoCache
 from bewerbung.search.base import SearchProvider
 from bewerbung.search.providers import build_providers
 from bewerbung.services.documents import DocumentStore
@@ -36,6 +42,7 @@ def create_app(
     page_fetcher: PageFetcher | None = None,
     search_providers: list[SearchProvider] | None = None,
     letter_generators: dict[str, LetterGenerator] | None = None,
+    aa_logos: AaLogoCache | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -60,6 +67,9 @@ def create_app(
         letter_generators if letter_generators is not None else build_generators(settings)
     )
     app.state.document_store = DocumentStore(resolve_documents_dir(settings))
+    app.state.aa_logos = aa_logos or AaLogoCache(
+        resolve_logos_dir(settings), settings.arbeitsagentur_api_key
+    )
     app.state.max_upload_bytes = settings.max_upload_mb * 1024 * 1024
 
     register_error_handlers(app)

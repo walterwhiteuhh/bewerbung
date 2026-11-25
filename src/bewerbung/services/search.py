@@ -92,6 +92,8 @@ def upsert_listing(
                 setattr(listing, key, value)
         listing.content_hash = content_hash
         listing.raw_payload = draft.raw
+    if draft.company_logo_url and listing.company_logo_url != draft.company_logo_url:
+        listing.company_logo_url = draft.company_logo_url  # nicht Teil des Inhalts-Hashs
     listing.last_seen_at = now
     listing.expired_at = None
     return listing, False
@@ -218,6 +220,7 @@ def save_listing(
     create = PostingCreate(
         title=listing.title,
         company_name=listing.company_name,
+        company_logo_url=listing.company_logo_url,
         location=listing.location,
         remote_type=listing.remote_type,
         employment_type=listing.employment_type,

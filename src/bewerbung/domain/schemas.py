@@ -64,6 +64,7 @@ class ImportPreview(_Schema):
     method: str = Field(description="'json-ld', 'opengraph' oder 'none'")
     title: str | None
     company_name: str | None
+    company_logo_url: str | None = None
     location: str | None
     remote_type: RemoteType
     employment_type: str | None
@@ -108,6 +109,9 @@ class _PostingFields(_Schema):
 class PostingCreate(_PostingFields):
     title: str = Field(min_length=1, max_length=500)
     company_name: OptStr = Field(default=None, max_length=255)
+    company_logo_url: OptStr = Field(
+        default=None, max_length=2048, description="Leer: wird aus raw_payload gelesen"
+    )
     url: OptStr = Field(default=None, max_length=2048)
     source: JobSource | None = Field(
         default=None, description="Leer lassen: wird aus der URL erkannt (sonst 'manual')"
@@ -140,6 +144,7 @@ class PostingUpdate(_Schema):
 class CompanyRead(_Schema):
     id: int
     name: str
+    logo_url: str | None = None
 
 
 class ApplicationSummary(_Schema):
@@ -307,6 +312,7 @@ class ListingRead(_Schema):
     url: str | None
     title: str
     company_name: str | None
+    company_logo_url: str | None = None
     location: str | None
     remote_type: RemoteType
     employment_type: str | None

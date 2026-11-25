@@ -16,6 +16,7 @@ from typing import Any
 import httpx
 
 from bewerbung.domain.enums import WORK_TIME_LABEL, JobSource, RemoteType
+from bewerbung.domain.logos import aa_logo_url
 from bewerbung.search.base import ListingDraft, ProviderError, SearchQuery
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ def to_draft(item: dict[str, Any]) -> ListingDraft | None:
         url=_first_str(item, "externeURL", "externeUrl") or DETAIL_URL.format(refnr=refnr),
         title=title,
         company_name=_company(item),
+        company_logo_url=aa_logo_url(item),
         location=_location(item),
         # Die Trefferliste kennzeichnet Minijobs, nennt aber sonst keine Arbeitszeit.
         employment_type="Minijob" if item.get("istGeringfuegigeBeschaeftigung") is True else None,

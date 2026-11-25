@@ -20,6 +20,7 @@ from bewerbung.db.models import (
 from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus, JobSource
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
+from bewerbung.domain.logos import logo_from_payload
 from bewerbung.domain.schemas import (
     PostingCreate,
     PostingFilter,
@@ -74,9 +75,13 @@ def create_posting(
     if (existing := find_duplicate(session, source, external_id, url_normalized)) is not None:
         raise DuplicatePostingError(existing)
 
+    logo_url = data.company_logo_url or logo_from_payload(data.raw_payload)
+    company = get_or_create_company(session, data.company_name) if data.company_name else None
+    if company is not None and logo_url and not company.logo_url:
+        company.logo_url = logo_url
     posting = JobPosting(
         title=data.title,
-        company=get_or_create_company(session, data.company_name) if data.company_name else None,
+        company=company,
         location=data.location,
         remote_type=data.remote_type,
         employment_type=data.employment_type,
@@ -113,6 +118,7 @@ def create_posting(
                 url_normalized=url_normalized,
                 title=data.title,
                 company_name=data.company_name,
+                company_logo_url=logo_url,
                 location=data.location,
                 remote_type=data.remote_type,
                 employment_type=data.employment_type,
@@ -164,6 +170,8 @@ def update_posting(
     if "company_name" in changes:
         name = changes.pop("company_name")
         posting.company = get_or_create_company(session, name) if name else None
+        if posting.company is not None and not posting.company.logo_url:
+            posting.company.logo_url = logo_from_payload(posting.raw_payload)
     if "url" in changes:
         url = changes.pop("url")
         posting.url = url

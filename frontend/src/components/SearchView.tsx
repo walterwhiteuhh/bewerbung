@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CompanyLogo } from "./CompanyLogo";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
@@ -395,7 +396,10 @@ function HitCard({
         {l.posted_at && <span className="muted">{formatDate(l.posted_at)}</span>}
       </div>
       <h3 className="card__title">{l.title}</h3>
-      <p className="card__company">{l.company_name ?? "Firma unbekannt"}</p>
+      <p className="card__company">
+        <CompanyLogo name={l.company_name} url={l.company_logo_url} />
+        <span>{l.company_name ?? "Firma unbekannt"}</span>
+      </p>
       <MetaLine items={[l.location, l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
       {l.description && (
         <p className={`card__desc ${expanded ? "is-open" : ""}`} onClick={() => setExpanded((x) => !x)}>
