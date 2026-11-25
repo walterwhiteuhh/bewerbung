@@ -18,6 +18,16 @@ export const EXITS: ApplicationStatus[] = ["rejected", "withdrawn"];
 export const SOURCE_LABEL: Record<JobSource, string> = {
   linkedin: "LinkedIn",
   stepstone: "Stepstone",
+  xing: "XING",
+  indeed: "Indeed",
+  arbeitsagentur: "Arbeitsagentur",
+  glassdoor: "Glassdoor",
+  personio: "Personio",
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  softgarden: "softgarden",
+  join: "JOIN",
+  workday: "Workday",
   manual: "Manuell",
   other: "Andere",
 };

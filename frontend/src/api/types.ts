@@ -12,7 +12,22 @@ export const STATUSES = [
 ] as const;
 export type ApplicationStatus = (typeof STATUSES)[number];
 
-export const SOURCES = ["linkedin", "stepstone", "manual", "other"] as const;
+export const SOURCES = [
+  "linkedin",
+  "stepstone",
+  "xing",
+  "indeed",
+  "arbeitsagentur",
+  "glassdoor",
+  "personio",
+  "greenhouse",
+  "lever",
+  "softgarden",
+  "join",
+  "workday",
+  "manual",
+  "other",
+] as const;
 export type JobSource = (typeof SOURCES)[number];
 
 export const REMOTE_TYPES = ["onsite", "hybrid", "remote", "unknown"] as const;

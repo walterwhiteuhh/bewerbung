@@ -35,7 +35,7 @@ def fetcher() -> FakeFetcher:
     return FakeFetcher(
         {
             STEPSTONE: html,
-            "https://linkedin.com/jobs/view/3912345678": html,
+            "https://www.linkedin.com/jobs/view/3912345678/": html,
         }
     )
 
@@ -79,7 +79,7 @@ def test_linkedin_search_url_fetches_detail_page(
 ) -> None:
     url = "https://www.linkedin.com/jobs/search/?currentJobId=3912345678&keywords=data"
     assert import_client.post("/api/sources/import", json={"url": url}).status_code == 200
-    assert fetcher.requested == ["https://linkedin.com/jobs/view/3912345678"]
+    assert fetcher.requested == ["https://www.linkedin.com/jobs/view/3912345678/"]
 
 
 def test_blocked_page_returns_502(import_client: TestClient) -> None:
@@ -99,3 +99,12 @@ def test_blocked_page_returns_502(import_client: TestClient) -> None:
 def test_fetcher_blocks_internal_targets(url: str, message: str) -> None:
     with pytest.raises(FetchError, match=message):
         asyncio.run(HttpPageFetcher().fetch(url))
+
+
+def test_captcha_page_returns_502(settings: Settings) -> None:
+    captcha = "<html><head><title>Just a moment...</title></head><body>cf-challenge</body></html>"
+    fake = FakeFetcher({"https://example.com/job/2": captcha})
+    with TestClient(create_app(settings, page_fetcher=fake)) as client:
+        resp = client.post("/api/sources/import", json={"url": "https://example.com/job/2"})
+    assert resp.status_code == 502
+    assert "Bot-Prüfung" in resp.json()["detail"]

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from bewerbung.domain.enums import RemoteType
-from bewerbung.sources.extract import extract_posting, html_to_text
+from bewerbung.sources.extract import extract_posting, html_to_text, looks_like_challenge
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -63,3 +64,42 @@ def test_page_without_data() -> None:
 )
 def test_html_to_text(html: str, expected: str) -> None:
     assert html_to_text(html) == expected
+
+
+def _jsonld(node: dict) -> str:
+    return (
+        f'<script type="application/ld+json">{json.dumps({"@type": "JobPosting", **node})}</script>'
+    )
+
+
+def test_real_world_quirks() -> None:
+    result = extract_posting(
+        _jsonld(
+            {
+                "title": "Engineer",
+                "description": "null<p>Wir suchen</p>",
+                "employmentType": "Full-Time",
+                "jobLocation": {"address": {"addressLocality": "DEU - Berlin"}},
+                "baseSalary": {
+                    "currency": "EUR",
+                    "value": {"minValue": 0, "maxValue": 0, "unitText": "YEAR"},
+                },
+            }
+        )
+    )
+    assert result.description == "Wir suchen"
+    assert result.employment_type == "Vollzeit"
+    assert result.location == "Berlin"
+    assert (result.salary_min, result.salary_max, result.salary_currency) == (None, None, None)
+
+
+def test_remote_from_location_text() -> None:
+    result = extract_posting(_jsonld({"title": "Dev", "jobLocation": {"address": "100% Remote"}}))
+    assert result.remote_type is RemoteType.REMOTE
+
+
+def test_challenge_page_detected() -> None:
+    html = "<html><head><title>Ihr Browser wird geprüft – reCAPTCHA</title></head></html>"
+    assert looks_like_challenge(html, extract_posting(html))
+    ok = load("stepstone_jsonld.html")
+    assert not looks_like_challenge(ok, extract_posting(ok))
