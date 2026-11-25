@@ -99,6 +99,13 @@ export const api = {
   profiles: () => request<SearchProfile[]>("/search/profiles"),
   createProfile: (p: Omit<SearchProfile, "id" | "created_at">) =>
     request<SearchProfile>("/search/profiles", json("POST", p)),
+  updateProfile: (id: number, p: Omit<SearchProfile, "id" | "created_at">) =>
+    request<SearchProfile>(`/search/profiles/${id}`, json("PUT", p)),
+  deleteRun: async (id: number) => {
+    const resp = await fetch(`/api/search/runs/${id}`, { method: "DELETE" });
+    if (!resp.ok) throw new ApiError(resp.status, "Löschen fehlgeschlagen");
+  },
+  clearRuns: () => request<{ hidden: number }>("/search/runs", { method: "DELETE" }),
   deleteProfile: async (id: number) => {
     const resp = await fetch(`/api/search/profiles/${id}`, { method: "DELETE" });
     if (!resp.ok) throw new ApiError(resp.status, "Löschen fehlgeschlagen");

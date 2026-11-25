@@ -361,6 +361,8 @@ class SearchRun(Base):
         UTCDateTime, default=utcnow, nullable=False, index=True
     )
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Aus "Letzte Suchen" entfernt. Der Lauf bleibt für Auswertungen (gezeigt -> gemerkt) erhalten.
+    hidden_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     total_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     errors: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)

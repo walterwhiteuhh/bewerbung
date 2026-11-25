@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import { OFFER_TYPES, WORK_TIMES, type JobSource, type Listing, type OfferType, type SearchParams, type SearchRun, type WorkTime } from "../api/types";
+import { OFFER_TYPES, WORK_TIMES, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchRun, type WorkTime } from "../api/types";
 import { formatDate, formatSalary, relativeTime } from "../lib/format";
 import { OFFER_TYPE_LABEL, REMOTE_LABEL, SOURCE_LABEL, WORK_TIME_LABEL } from "../lib/labels";
 import { MetaLine, SourceTag } from "./Badges";
@@ -31,6 +31,8 @@ export function SearchView({ onOpenPosting }: Props) {
     sources: [],
   });
   const [run, setRun] = useState<SearchRun | null>(null);
+  // Gerade bearbeitete gespeicherte Suche (null = neue Suche)
+  const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
   const [onlyNew, setOnlyNew] = useState(false);
 
   const available = (providers.data ?? []).filter((p) => p.available);
@@ -47,29 +49,61 @@ export function SearchView({ onOpenPosting }: Props) {
     onError: (e) => toast(e.message, "error"),
   });
 
+  const profilePayload = (name: string) => ({
+    name: name.trim() || [form.query, form.location, ...form.work_times.map((w) => WORK_TIME_LABEL[w])].filter(Boolean).join(" · "),
+    query: form.query,
+    location: form.location || null,
+    radius_km: form.location ? form.radius_km : null,
+    remote_only: form.remote_only,
+    work_times: form.work_times,
+    offer_type: form.offer_type,
+    sources: form.sources,
+  });
+
   const saveProfile = useMutation({
     mutationFn: () =>
-      api.createProfile({
-        name: [form.query, form.location, ...form.work_times.map((w) => WORK_TIME_LABEL[w])].filter(Boolean).join(" · "),
-        query: form.query,
-        location: form.location || null,
-        radius_km: form.location ? form.radius_km : null,
-        remote_only: form.remote_only,
-        work_times: form.work_times,
-        offer_type: form.offer_type,
-        sources: form.sources,
-      }),
+      editing ? api.updateProfile(editing.id, profilePayload(editing.name)) : api.createProfile(profilePayload("")),
     onSuccess: () => {
-      toast("Suche gespeichert");
+      toast(editing ? "Gespeicherte Suche aktualisiert" : "Suche gespeichert");
+      setEditing(null);
       void qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
+    onError: (e) => toast(e.message, "error"),
+  });
+
+  const deleteRun = useMutation({
+    mutationFn: api.deleteRun,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["runs"] }),
+    onError: (e) => toast(e.message, "error"),
+  });
+  const clearRuns = useMutation({
+    mutationFn: api.clearRuns,
+    onSuccess: () => {
+      toast("Verlauf geleert");
+      void qc.invalidateQueries({ queryKey: ["runs"] });
     },
     onError: (e) => toast(e.message, "error"),
   });
 
   const deleteProfile = useMutation({
     mutationFn: api.deleteProfile,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+    onSuccess: (_d, id) => {
+      if (editing?.id === id) setEditing(null);
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
   });
+
+  function profileToParams(p: SearchProfile): SearchParams {
+    return {
+      query: p.query,
+      location: p.location ?? "",
+      radius_km: p.radius_km ?? 25,
+      remote_only: p.remote_only,
+      work_times: p.work_times ?? [],
+      offer_type: p.offer_type ?? "arbeit",
+      sources: p.sources,
+    };
+  }
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -176,9 +210,25 @@ export function SearchView({ onOpenPosting }: Props) {
           </label>
         </div>
 
+        {editing && (
+          <label className="field search-form__editname">
+            <span>Name der gespeicherten Suche</span>
+            <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+          </label>
+        )}
         <div className="search-form__actions">
-          <button type="button" className="btn btn--ghost" disabled={!form.query.trim() || saveProfile.isPending} onClick={() => saveProfile.mutate()}>
-            Suche speichern
+          {editing && (
+            <button type="button" className="btn btn--ghost" onClick={() => setEditing(null)}>
+              Abbrechen
+            </button>
+          )}
+          <button
+            type="button"
+            className={editing ? "btn" : "btn btn--ghost"}
+            disabled={!form.query.trim() || saveProfile.isPending}
+            onClick={() => saveProfile.mutate()}
+          >
+            {editing ? "Änderungen speichern" : "Suche speichern"}
           </button>
           <button type="submit" className="btn btn--primary" disabled={search.isPending || available.length === 0}>
             {search.isPending ? <span className="spinner spinner--light" aria-label="Sucht" /> : "Suchen"}
@@ -190,26 +240,38 @@ export function SearchView({ onOpenPosting }: Props) {
         <div className="saved-searches">
           <span className="muted">Gespeichert:</span>
           {profiles.data!.map((p) => (
-            <span key={p.id} className="chip chip--split">
+            <span key={p.id} className={`chip chip--split ${editing?.id === p.id ? "is-active" : ""}`}>
               <button
                 type="button"
+                title="Suche ausführen"
                 onClick={() => {
-                  const params: SearchParams = {
-                    query: p.query,
-                    location: p.location ?? "",
-                    radius_km: p.radius_km ?? 25,
-                    remote_only: p.remote_only,
-                    work_times: p.work_times ?? [],
-                    offer_type: p.offer_type ?? "arbeit",
-                    sources: p.sources,
-                  };
+                  const params = profileToParams(p);
                   setForm(params);
                   search.mutate({ ...params, profile_id: p.id });
                 }}
               >
                 {p.name}
               </button>
-              <button type="button" aria-label={`${p.name} löschen`} onClick={() => deleteProfile.mutate(p.id)}>
+              <button
+                type="button"
+                aria-label={`${p.name} bearbeiten`}
+                title="Bearbeiten"
+                onClick={() => {
+                  setForm(profileToParams(p));
+                  setEditing({ id: p.id, name: p.name });
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                ✎
+              </button>
+              <button
+                type="button"
+                aria-label={`${p.name} löschen`}
+                title="Löschen"
+                onClick={() => {
+                  if (window.confirm(`Gespeicherte Suche „${p.name}“ löschen?`)) deleteProfile.mutate(p.id);
+                }}
+              >
                 ✕
               </button>
             </span>
@@ -243,7 +305,21 @@ export function SearchView({ onOpenPosting }: Props) {
         </section>
       ) : (
         <section className="recent">
-          <h3 className="section-title">Letzte Suchen</h3>
+          <div className="recent__head">
+            <h3 className="section-title">Letzte Suchen</h3>
+            {(runs.data?.length ?? 0) > 0 && (
+              <button
+                type="button"
+                className="btn btn--small btn--ghost"
+                disabled={clearRuns.isPending}
+                onClick={() => {
+                  if (window.confirm("Verlauf der letzten Suchen leeren?")) clearRuns.mutate();
+                }}
+              >
+                Verlauf leeren
+              </button>
+            )}
+          </div>
           {(runs.data?.length ?? 0) === 0 ? (
             <div className="empty">
               <p className="empty__title">Noch nicht gesucht</p>
@@ -252,7 +328,7 @@ export function SearchView({ onOpenPosting }: Props) {
           ) : (
             <ul className="recent__list">
               {runs.data!.map((r) => (
-                <li key={r.id}>
+                <li key={r.id} className="recent__row">
                   <button
                     type="button"
                     className="recent__item"
@@ -265,6 +341,15 @@ export function SearchView({ onOpenPosting }: Props) {
                     <span className="muted">
                       {r.total_hits} Treffer · {relativeTime(r.started_at)}
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn recent__delete"
+                    aria-label={`Suche „${r.query}“ aus dem Verlauf löschen`}
+                    title="Aus dem Verlauf löschen"
+                    onClick={() => deleteRun.mutate(r.id)}
+                  >
+                    ✕
                   </button>
                 </li>
               ))}

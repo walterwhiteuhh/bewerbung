@@ -171,7 +171,8 @@ default_registry().register(XingAdapter())
 | GET | `/api/search/providers` | Verfügbare Such-Quellen |
 | POST | `/api/search` | Live-Suche über Portale |
 | GET | `/api/search/runs` · `/runs/{id}` | Suchhistorie |
-| GET/POST/DELETE | `/api/search/profiles` | Gespeicherte Suchen |
+| GET/POST · PUT/DELETE `/{id}` | `/api/search/profiles` | Gespeicherte Suchen anlegen, bearbeiten, löschen |
+| DELETE | `/api/search/runs/{id}` · `/api/search/runs` | Suche aus „Letzte Suchen“ entfernen / Verlauf leeren (nur ausgeblendet, Treffer-Historie bleibt) |
 | POST | `/api/listings/{id}/save` | Treffer merken |
 | GET/PUT | `/api/profile` | Eigenes Profil (Grundlage der Anschreiben) |
 | GET | `/api/letters/generators` | Claude, ChatGPT, Gemini, Vorlage und ob ein Key da ist |

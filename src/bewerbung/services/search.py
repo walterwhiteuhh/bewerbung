@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from itertools import chain, zip_longest
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, selectinload
 
 from bewerbung.db.models import JobPosting, Listing, SearchHit, SearchProfile, SearchRun
@@ -110,10 +110,11 @@ async def run_search(
 ) -> SearchRun:
     wanted = [p for p in providers if not req.sources or p.source in req.sources]
     usable = [p for p in wanted if p.unavailable_reason is None]
+    # Fehlende Keys nur melden, wenn die Quelle ausdrücklich gewählt wurde.
     errors = [
         {"source": p.source.value, "message": p.unavailable_reason or ""}
         for p in wanted
-        if p.unavailable_reason is not None
+        if p.unavailable_reason is not None and req.sources
     ]
 
     query = SearchQuery(
@@ -175,7 +176,28 @@ def get_run(session: Session, run_id: int) -> SearchRun:
 
 
 def list_runs(session: Session, limit: int = 20) -> list[SearchRun]:
-    return list(session.scalars(select(SearchRun).order_by(SearchRun.id.desc()).limit(limit)))
+    stmt = (
+        select(SearchRun)
+        .where(SearchRun.hidden_at.is_(None))
+        .order_by(SearchRun.id.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
+
+
+def hide_run(session: Session, run_id: int) -> None:
+    run = session.get(SearchRun, run_id)
+    if run is None:
+        raise NotFoundError("Suchlauf", run_id)
+    run.hidden_at = run.hidden_at or utcnow()
+    session.flush()
+
+
+def hide_all_runs(session: Session) -> int:
+    result = session.execute(
+        update(SearchRun).where(SearchRun.hidden_at.is_(None)).values(hidden_at=utcnow())
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def get_listing(session: Session, listing_id: int) -> Listing:
@@ -250,9 +272,23 @@ def list_profiles(session: Session) -> list[SearchProfile]:
     )
 
 
-def archive_profile(session: Session, profile_id: int) -> None:
+def _active_profile(session: Session, profile_id: int) -> SearchProfile:
     profile = session.get(SearchProfile, profile_id)
-    if profile is None:
+    if profile is None or profile.archived_at is not None:
         raise NotFoundError("Suchprofil", profile_id)
+    return profile
+
+
+def update_profile(session: Session, profile_id: int, data: SearchProfileCreate) -> SearchProfile:
+    """Gespeicherte Suche ändern. Frühere Läufe behalten ihre eigenen Parameter (Snapshot)."""
+    profile = _active_profile(session, profile_id)
+    for key, value in data.model_dump(mode="json").items():
+        setattr(profile, key, value)
+    session.flush()
+    return profile
+
+
+def archive_profile(session: Session, profile_id: int) -> None:
+    profile = _active_profile(session, profile_id)
     profile.archived_at = utcnow()
     session.flush()

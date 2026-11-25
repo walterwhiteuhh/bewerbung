@@ -380,3 +380,49 @@ def test_arbeitsagentur_marks_minijob_and_search_keeps_known_values(
     hit = next(h for h in again["hits"] if h["listing"]["id"] == listing_id)
     assert hit["listing"]["title"] == "Neu"
     assert hit["listing"]["employment_type"] == "Minijob"
+
+
+def test_edit_profile_and_hide_runs(search_client: TestClient) -> None:
+    pid = search_client.post("/api/search/profiles", json={"name": "Alt", "query": "data"}).json()[
+        "id"
+    ]
+    updated = search_client.put(
+        f"/api/search/profiles/{pid}",
+        json={
+            "name": "Minijobs HH",
+            "query": "verkauf",
+            "location": "Hamburg",
+            "work_times": ["minijob"],
+        },
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert (body["name"], body["query"], body["work_times"]) == (
+        "Minijobs HH",
+        "verkauf",
+        ["minijob"],
+    )
+    search_client.delete(f"/api/search/profiles/{pid}")
+    assert (
+        search_client.put(f"/api/search/profiles/{pid}", json=body | {"id": None}).status_code
+        == 404
+    )
+
+    r1 = search_client.post("/api/search", json={"query": "a"}).json()["id"]
+    r2 = search_client.post("/api/search", json={"query": "b"}).json()["id"]
+    assert search_client.delete(f"/api/search/runs/{r1}").status_code == 204
+    assert [r["id"] for r in search_client.get("/api/search/runs").json()] == [r2]
+    # Ausgeblendete Läufe bleiben abrufbar (Treffer-Historie für Auswertungen)
+    assert search_client.get(f"/api/search/runs/{r1}").status_code == 200
+    assert search_client.delete("/api/search/runs").json() == {"hidden": 1}
+    assert search_client.get("/api/search/runs").json() == []
+
+
+def test_missing_keys_only_reported_when_source_chosen(
+    settings: Settings, aa: FakeProvider
+) -> None:
+    nokey = FakeProvider(JobSource.JOOBLE, [], unavailable="API-Key fehlt")
+    with TestClient(create_app(settings, search_providers=[aa, nokey])) as c:
+        assert c.post("/api/search", json={"query": "x"}).json()["errors"] == []
+        chosen = c.post("/api/search", json={"query": "x", "sources": ["jooble"]}).json()
+        assert chosen["errors"] == [{"source": "jooble", "message": "API-Key fehlt"}]
