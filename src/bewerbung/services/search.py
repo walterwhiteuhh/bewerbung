@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from itertools import chain, zip_longest
 from typing import Any
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session, selectinload
+from starlette.concurrency import run_in_threadpool
 
-from bewerbung.db.models import JobPosting, Listing, SearchHit, SearchProfile, SearchRun
+from bewerbung.db.models import Company, JobPosting, Listing, SearchHit, SearchProfile, SearchRun
 from bewerbung.db.types import utcnow
+from bewerbung.domain.enums import JobSource
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
 from bewerbung.domain.keywords import suggest_tags
+from bewerbung.domain.matching import company_key
 from bewerbung.domain.schemas import (
     PostingCreate,
     ProviderInfo,
@@ -53,23 +56,74 @@ def _normalized_url(registry: SourceRegistry, url: str | None) -> str | None:
         return None
 
 
+Key = tuple[JobSource, str | None]
+
+
+class _Known:
+    """Bekannte Anzeigen, Stellen und Firmen eines Laufs, in wenigen Abfragen vorgeladen
+    (statt je Treffer drei Einzelabfragen)."""
+
+    def __init__(self, session: Session, drafts: Sequence[ListingDraft]) -> None:
+        keys = {(d.source, d.external_id) for d in drafts}
+        self.listings: dict[Key, Listing] = {}
+        self.posting_ids: dict[Key, int] = {}
+        self.companies: dict[str, Company] = {}
+        for source in {k[0] for k in keys}:
+            ids = [k[1] for k in keys if k[0] == source]
+            for chunk in _chunks(ids, 500):
+                for lst in session.scalars(
+                    select(Listing).where(Listing.source == source, Listing.external_id.in_(chunk))
+                ):
+                    self.listings[(lst.source, lst.external_id)] = lst
+                for pid, ext in session.execute(
+                    select(JobPosting.id, JobPosting.external_id).where(
+                        JobPosting.source == source, JobPosting.external_id.in_(chunk)
+                    )
+                ):
+                    self.posting_ids[(source, ext)] = pid
+        names = {
+            company_key(d.company_name) for d in drafts if d.company_name and d.company_name.strip()
+        }
+        for chunk in _chunks(list(names), 500):
+            for company in session.scalars(select(Company).where(Company.name_key.in_(chunk))):
+                self.companies[company.name_key] = company
+
+
+def _chunks(items: list[Any], size: int) -> Iterator[list[Any]]:
+    for i in range(0, len(items), size):
+        yield items[i : i + size]
+
+
 def upsert_listing(
-    session: Session, registry: SourceRegistry, draft: ListingDraft, now: datetime
+    session: Session,
+    registry: SourceRegistry,
+    draft: ListingDraft,
+    now: datetime,
+    known: _Known | None = None,
 ) -> tuple[Listing, bool]:
     """Neue Anzeige anlegen oder bestehende aktualisieren. Gibt (listing, ist_neu) zurück."""
-    listing = session.scalar(
-        select(Listing).where(
-            Listing.source == draft.source, Listing.external_id == draft.external_id
+    lookup = (draft.source, draft.external_id)
+    cache = known.companies if known is not None else None
+    if known is not None:
+        listing = known.listings.get(lookup)
+    else:
+        listing = session.scalar(
+            select(Listing).where(
+                Listing.source == draft.source, Listing.external_id == draft.external_id
+            )
         )
-    )
     fields = draft.model_dump(exclude={"raw", "source", "external_id"})
     content_hash = draft.content_hash()
 
     if listing is None:
         # Schon manuell gemerkt? Dann direkt mit der Stelle verknüpfen.
-        posting_id = session.scalar(
-            select(JobPosting.id).where(
-                JobPosting.source == draft.source, JobPosting.external_id == draft.external_id
+        posting_id = (
+            known.posting_ids.get(lookup)
+            if known is not None
+            else session.scalar(
+                select(JobPosting.id).where(
+                    JobPosting.source == draft.source, JobPosting.external_id == draft.external_id
+                )
             )
         )
         listing = Listing(
@@ -83,8 +137,10 @@ def upsert_listing(
             raw_payload=draft.raw,
             **fields,
         )
-        derive_listing_keys(session, listing)
+        derive_listing_keys(session, listing, cache)
         session.add(listing)
+        if known is not None:
+            known.listings[lookup] = listing
         return listing, True
 
     if listing.content_hash != content_hash:
@@ -95,11 +151,11 @@ def upsert_listing(
                 setattr(listing, key, value)
         listing.content_hash = content_hash
         listing.raw_payload = draft.raw
-        derive_listing_keys(session, listing)
+        derive_listing_keys(session, listing, cache)
     if draft.company_logo_url and listing.company_logo_url != draft.company_logo_url:
         listing.company_logo_url = draft.company_logo_url  # nicht Teil des Inhalts-Hashs
     if listing.title_key is None:  # Altbestand ohne abgeleitete Felder
-        derive_listing_keys(session, listing)
+        derive_listing_keys(session, listing, cache)
     listing.last_seen_at = now
     listing.expired_at = None
     return listing, False
@@ -110,12 +166,23 @@ def _interleave(results: list[list[ListingDraft]]) -> list[ListingDraft]:
     return [d for d in chain.from_iterable(zip_longest(*results)) if d is not None]
 
 
-async def run_search(
-    session: Session,
-    registry: SourceRegistry,
-    providers: Sequence[SearchProvider],
-    req: SearchRequest,
-) -> SearchRun:
+class FetchedSearch:
+    """Ergebnis der Netzwerkphase: Treffer je Portal plus Fehlermeldungen, noch ohne DB-Zugriff."""
+
+    def __init__(
+        self,
+        req: SearchRequest,
+        wanted: list[SearchProvider],
+        results: list[list[ListingDraft]],
+        errors: list[dict[str, str]],
+        started_at: datetime,
+    ) -> None:
+        self.req, self.wanted, self.results = req, wanted, results
+        self.errors, self.started_at = errors, started_at
+
+
+async def fetch_search(providers: Sequence[SearchProvider], req: SearchRequest) -> FetchedSearch:
+    """Gewählte Portale parallel abfragen (reines I/O, die DB bleibt unberührt)."""
     wanted = [p for p in providers if not req.sources or p.source in req.sources]
     usable = [p for p in wanted if p.unavailable_reason is None]
     # Fehlende Keys nur melden, wenn die Quelle ausdrücklich gewählt wurde.
@@ -124,7 +191,6 @@ async def run_search(
         for p in wanted
         if p.unavailable_reason is not None and req.sources
     ]
-
     query = SearchQuery(
         query=req.query,
         location=req.location,
@@ -133,18 +199,7 @@ async def run_search(
         work_times=req.work_times,
         offer_type=req.offer_type,
     )
-    run = SearchRun(
-        profile_id=req.profile_id,
-        query=req.query,
-        location=req.location,
-        radius_km=req.radius_km,
-        remote_only=req.remote_only,
-        work_times=list(req.work_times),
-        offer_type=req.offer_type,
-        sources=[p.source.value for p in wanted],
-        started_at=utcnow(),
-    )
-
+    started_at = utcnow()
     outcomes = await asyncio.gather(*(p.search(query) for p in usable), return_exceptions=True)
     results: list[list[ListingDraft]] = []
     for provider, outcome in zip(usable, outcomes, strict=True):
@@ -153,25 +208,58 @@ async def run_search(
             errors.append({"source": provider.source.value, "message": str(outcome)})
         else:
             results.append(outcome)
+    return FetchedSearch(req, wanted, results, errors, started_at)
 
+
+def persist_search(session: Session, registry: SourceRegistry, fetched: FetchedSearch) -> SearchRun:
+    """Treffer speichern (blockierend: im Threadpool aufrufen, nicht im Event-Loop).
+
+    Vorhandene Anzeigen, Stellen und Firmen werden gesammelt vorgeladen und nur einmal
+    am Ende geflusht, statt je Treffer mehrere Abfragen zu stellen.
+    """
+    req = fetched.req
+    run = SearchRun(
+        profile_id=req.profile_id,
+        query=req.query,
+        location=req.location,
+        radius_km=req.radius_km,
+        remote_only=req.remote_only,
+        work_times=list(req.work_times),
+        offer_type=req.offer_type,
+        sources=[p.source.value for p in fetched.wanted],
+        started_at=fetched.started_at,
+    )
+    drafts = _interleave(fetched.results)
+    known = _Known(session, drafts)
     now = utcnow()
-    seen: set[int] = set()
-    for draft in _interleave(results):
-        listing, is_new = upsert_listing(session, registry, draft, now)
-        session.flush()
-        if listing.id in seen:
+    seen: set[Key] = set()
+    for draft in drafts:
+        key = (draft.source, draft.external_id)
+        if key in seen:
             continue
-        seen.add(listing.id)
+        seen.add(key)
+        listing, is_new = upsert_listing(session, registry, draft, now, known)
         run.hits.append(SearchHit(listing=listing, rank=len(run.hits) + 1, is_new=is_new))
 
     run.total_hits = len(run.hits)
     run.new_hits = sum(h.is_new for h in run.hits)
-    run.errors = errors
+    run.errors = fetched.errors
     run.finished_at = utcnow()
     session.add(run)
     session.flush()
     logger.info("Suchlauf %s: %d Treffer (%d neu)", run.id, run.total_hits, run.new_hits)
     return run
+
+
+async def run_search(
+    session: Session,
+    registry: SourceRegistry,
+    providers: Sequence[SearchProvider],
+    req: SearchRequest,
+) -> SearchRun:
+    """Netzwerk asynchron, Speichern im Threadpool, damit der Event-Loop frei bleibt."""
+    fetched = await fetch_search(providers, req)
+    return await run_in_threadpool(persist_search, session, registry, fetched)
 
 
 def get_run(session: Session, run_id: int) -> SearchRun:

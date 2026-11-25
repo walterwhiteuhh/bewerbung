@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from bewerbung.db.types import utcnow
 from bewerbung.domain.keywords import suggest_tags
@@ -28,7 +29,7 @@ async def preview_import(
     target = adapter.fetch_url(reference, url)
 
     html = await fetcher.fetch(target)  # FetchError geht als 502 an die API
-    extracted = extract_posting(html)
+    extracted = await run_in_threadpool(extract_posting, html)  # HTML-Parsing ist CPU-lastig
     if looks_like_challenge(html, extracted):
         raise FetchError(
             "Die Seite zeigt eine Bot-Prüfung (Captcha) statt der Anzeige,"

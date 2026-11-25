@@ -7,6 +7,7 @@ from datetime import timedelta
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from bewerbung.config import Settings
 from bewerbung.db.models import SearchRun
@@ -462,3 +463,30 @@ def test_run_history_filter_and_partial_clear(search_client: TestClient) -> None
     assert search_client.get(f"/api/search/runs/{old}").status_code == 200
     # Bereits ausgeblendete werden nicht doppelt gezählt
     assert search_client.delete("/api/search/runs").json() == {"hidden": 0}
+
+
+def test_search_persist_uses_constant_number_of_queries(settings: Settings) -> None:
+    """Treffer werden gesammelt vorgeladen: die Zahl der SELECTs hängt nicht von der Trefferzahl ab."""
+    drafts = [
+        draft(JobSource.ARBEITSAGENTUR, f"1-{i}", f"Job {i}", company_name=f"Firma {i % 7}")
+        for i in range(60)
+    ]
+    prov = FakeProvider(JobSource.ARBEITSAGENTUR, drafts)
+    with TestClient(create_app(settings, search_providers=[prov])) as c:
+        engine = c.app.state.session_factory.kw["bind"]  # type: ignore[attr-defined]
+        selects: list[str] = []
+
+        @event.listens_for(engine, "before_cursor_execute")
+        def _count(_c, _cur, statement, *_a):  # type: ignore[no-untyped-def]
+            if statement.lstrip().upper().startswith("SELECT"):
+                selects.append(statement)
+
+        first = c.post("/api/search", json={"query": "x"}).json()
+        assert (first["total_hits"], first["new_hits"]) == (60, 60)
+        n_first = len(selects)
+        selects.clear()
+        second = c.post("/api/search", json={"query": "x"}).json()
+        assert (second["total_hits"], second["new_hits"]) == (60, 0)
+        # Antwort inkl. Merkmale mitgezählt; mit 60 statt 6 Treffern käme ein Vielfaches
+        assert n_first < 60, n_first
+        assert len(selects) < 60, len(selects)

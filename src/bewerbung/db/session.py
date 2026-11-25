@@ -35,6 +35,10 @@ def build_engine(database_url: str, *, echo: bool = False) -> Engine:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")  # WAL: sicher und schneller
+            cursor.execute("PRAGMA busy_timeout=5000")  # kurz warten statt "database is locked"
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA cache_size=-20000")  # ca. 20 MB Seitencache je Verbindung
             cursor.close()
 
     logger.info("Datenbank: %s", url.render_as_string(hide_password=True))

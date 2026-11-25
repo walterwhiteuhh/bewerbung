@@ -9,6 +9,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from bewerbung.api.deps import (
     AaLogosDep,
@@ -527,7 +528,9 @@ async def upload_document(
         if size > limit:
             raise DomainError(f"Datei ist größer als {limit // (1024 * 1024)} MB")
         chunks.append(chunk)
-    doc = documents.upload(
+    # Hashen, Textauslese (PDF/Word) und Schreiben sind blockierend: raus aus dem Event-Loop.
+    doc = await run_in_threadpool(
+        documents.upload,
         session,
         store,
         data=b"".join(chunks),
