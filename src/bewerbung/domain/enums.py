@@ -9,6 +9,17 @@ class JobSource(StrEnum):
     MANUAL = "manual"
     LINKEDIN = "linkedin"
     STEPSTONE = "stepstone"
+    XING = "xing"
+    INDEED = "indeed"
+    ARBEITSAGENTUR = "arbeitsagentur"
+    GLASSDOOR = "glassdoor"
+    # Bewerbermanagement-Systeme (Karriereseiten vieler Firmen)
+    PERSONIO = "personio"
+    GREENHOUSE = "greenhouse"
+    LEVER = "lever"
+    SOFTGARDEN = "softgarden"
+    JOIN = "join"
+    WORKDAY = "workday"
     OTHER = "other"
 
 

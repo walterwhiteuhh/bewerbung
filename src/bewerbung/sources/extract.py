@@ -24,7 +24,17 @@ from bewerbung.domain.enums import RemoteType
 
 logger = logging.getLogger(__name__)
 
-EXTRACTOR_VERSION = "1"
+EXTRACTOR_VERSION = "2"
+
+# Bot-Schutz-Seiten (Captcha, Cloudflare, Login-Wall) dürfen nicht als Anzeige durchgehen.
+_CHALLENGE = re.compile(
+    r"recaptcha|hcaptcha|cf-challenge|challenge-platform|just a moment\.\.\.|"
+    r"checking your browser|browser wird geprüft|ihr browser wird überprüft|"
+    r"are you a robot|bist du ein mensch|authwall|access denied",
+    re.IGNORECASE,
+)
+_COUNTRY_PREFIX = re.compile(r"^[A-Z]{2,3}\s*-\s*")
+_REMOTE_WORDS = re.compile(r"\b(remote|home[ -]?office|telearbeit|mobiles arbeiten)\b", re.I)
 
 _BLOCK_TAGS = {"p", "div", "br", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "tr"}
 _PERIOD_FACTOR = {"YEAR": 1, "MONTH": 12, "WEEK": 52}
@@ -112,7 +122,8 @@ def html_to_text(value: str) -> str:
     parser.feed(unescape(value) if "&lt;" in value else value)
     text = "".join(parser.parts)
     lines = [re.sub(r"[ \t\u00a0]+", " ", line).strip() for line in text.splitlines()]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+    return re.sub(r"^(?:null|undefined)(?![a-z])\s*", "", text)  # Artefakte mancher Portale
 
 
 def _iter_nodes(data: Any) -> list[dict[str, Any]]:
@@ -159,15 +170,20 @@ def _location(node: dict[str, Any]) -> str | None:
             city = _text(address.get("addressLocality")) or _text(address.get("addressRegion"))
         else:
             city = _text(address)
+        city = _COUNTRY_PREFIX.sub("", city) if city else None
         if city and city not in cities:
             cities.append(city)
     return ", ".join(cities) or None
 
 
-def _remote(node: dict[str, Any]) -> RemoteType:
+def _remote(node: dict[str, Any], location: str | None) -> RemoteType:
     loc_type = json.dumps(node.get("jobLocationType", "")).upper()
+    if location and _REMOTE_WORDS.search(location):
+        return RemoteType.REMOTE
     if "TELECOMMUTE" in loc_type:
         return RemoteType.HYBRID if node.get("jobLocation") else RemoteType.REMOTE
+    if _REMOTE_WORDS.search(_text(node.get("title")) or ""):
+        return RemoteType.HYBRID
     return RemoteType.UNKNOWN
 
 
@@ -183,7 +199,14 @@ def _employment(node: dict[str, Any]) -> str | None:
     }
     raw = node.get("employmentType")
     values = raw if isinstance(raw, list) else [raw]
-    out = [labels.get(str(v).upper(), str(v)) for v in values if v]
+    out: list[str] = []
+    for v in values:
+        if not v:
+            continue
+        key = re.sub(r"[\s-]+", "_", str(v).strip().upper())
+        label = labels.get(key, str(v).strip())
+        if label not in out:
+            out.append(label)
     return ", ".join(out) or None
 
 
@@ -201,12 +224,15 @@ def _salary(node: dict[str, Any]) -> tuple[int | None, int | None, str | None]:
 
     def num(key: str) -> int | None:
         try:
-            return round(float(value[key]) * factor) if value.get(key) is not None else None
+            amount = round(float(value[key]) * factor) if value.get(key) is not None else None
         except (TypeError, ValueError):
             return None
+        return amount if amount and amount > 0 else None  # "0-0" = keine Angabe
 
     lo = num("minValue") or num("value")
     hi = num("maxValue") or (num("value") if lo is not None and num("minValue") is None else None)
+    if lo is None and hi is None:
+        return None, None, None
     return lo, hi, currency.upper()[:3] if currency else None
 
 
@@ -226,12 +252,13 @@ def _date(value: Any) -> datetime | None:
 
 def _from_json_ld(node: dict[str, Any]) -> ExtractedPosting:
     lo, hi, currency = _salary(node)
+    location = _location(node)
     description = node.get("description")
     return ExtractedPosting(
         title=_text(node.get("title")) or _text(node.get("name")),
         company_name=_text(node.get("hiringOrganization")),
-        location=_location(node),
-        remote_type=_remote(node),
+        location=location,
+        remote_type=_remote(node, location),
         employment_type=_employment(node),
         salary_min=lo,
         salary_max=hi,
@@ -252,6 +279,14 @@ def _from_meta(meta: dict[str, str], page_title: str) -> ExtractedPosting:
         method="opengraph" if title else "none",
         raw={"meta": {k: v for k, v in meta.items() if k.startswith(("og:", "description"))}},
     )
+
+
+def looks_like_challenge(html: str, extracted: ExtractedPosting) -> bool:
+    """True, wenn statt der Anzeige eine Bot-Prüfung kam (nur ohne JSON-LD geprüft)."""
+    if extracted.method == "json-ld":
+        return False
+    head = html[:20_000]
+    return bool(_CHALLENGE.search(head) or _CHALLENGE.search(extracted.title or ""))
 
 
 def extract_posting(html: str) -> ExtractedPosting:

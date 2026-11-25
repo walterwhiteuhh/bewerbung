@@ -10,8 +10,8 @@ from bewerbung.db.types import utcnow
 from bewerbung.domain.schemas import ImportPreview
 from bewerbung.services.postings import detect_source
 from bewerbung.sources import SourceRegistry
-from bewerbung.sources.extract import EXTRACTOR_VERSION, extract_posting
-from bewerbung.sources.fetcher import PageFetcher
+from bewerbung.sources.extract import EXTRACTOR_VERSION, extract_posting, looks_like_challenge
+from bewerbung.sources.fetcher import FetchError, PageFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,11 @@ async def preview_import(
 
     html = await fetcher.fetch(target)  # FetchError geht als 502 an die API
     extracted = extract_posting(html)
+    if looks_like_challenge(html, extracted):
+        raise FetchError(
+            "Die Seite zeigt eine Bot-Prüfung (Captcha) statt der Anzeige,"
+            " bitte Daten manuell eintragen"
+        )
 
     warnings: list[str] = []
     if extracted.method == "none":

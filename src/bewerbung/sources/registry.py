@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from functools import lru_cache
 
 from bewerbung.domain.enums import JobSource
-from bewerbung.sources.adapters import GenericAdapter, LinkedInAdapter, StepstoneAdapter
+from bewerbung.sources.adapters import GenericAdapter, platform_adapters
 from bewerbung.sources.base import SourceAdapter, SourceReference, parse_url
 
 
@@ -31,4 +31,4 @@ class SourceRegistry:
 
 @lru_cache
 def default_registry() -> SourceRegistry:
-    return SourceRegistry([LinkedInAdapter(), StepstoneAdapter()], fallback=GenericAdapter())
+    return SourceRegistry(platform_adapters(), fallback=GenericAdapter())
