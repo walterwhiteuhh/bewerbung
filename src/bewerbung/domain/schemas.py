@@ -11,6 +11,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    field_validator,
     model_validator,
 )
 
@@ -149,7 +150,13 @@ class CompanyRead(_Schema):
     industry: str | None = None
     location: str | None = None
     logo_source: str | None = None
+    social_links: dict[str, str] = Field(default_factory=dict)
     posting_count: int | None = Field(default=None, description="Nur in der Firmenliste")
+
+    @field_validator("social_links", mode="before")
+    @classmethod
+    def _none_to_empty(cls, value: Any) -> Any:
+        return value or {}
 
 
 class CompanyUpdate(_Schema):
@@ -158,6 +165,9 @@ class CompanyUpdate(_Schema):
     industry: OptStr = Field(default=None, max_length=120)
     location: OptStr = Field(default=None, max_length=255)
     logo_url: OptStr = Field(default=None, max_length=2048, description="Leer = Logo entfernen")
+    social_links: list[Annotated[str, Field(max_length=2048)]] | None = Field(
+        default=None, max_length=12, description="Profil-URLs; ersetzt die bisherigen"
+    )
 
 
 class ApplicationSummary(_Schema):
@@ -408,6 +418,8 @@ class ProfileRead(_Schema):
     signature: str | None
     home_location: str | None = None
     home_located: bool = Field(default=False, description="Koordinaten des Wohnorts bekannt")
+    home_lat: float | None = None
+    home_lon: float | None = None
     max_distance_km: int | None = None
     updated_at: datetime | None = None
 
@@ -532,6 +544,8 @@ class CompanyActivity(_Schema):
     listings: int = Field(description="Anzeigen dieser Firma in deinen Suchen/Importen")
     active_listings: int = Field(description="davon in den letzten 14 Tagen gesehen")
     portals: list[JobSource]
+    website: str | None = None
+    social_links: dict[str, str] = Field(default_factory=dict)
     saved_postings: int
     applications: int = Field(description="Bewerbungen mit Status ab 'beworben'")
     rejections: int
@@ -551,7 +565,13 @@ class JobFeatures(_Schema):
     """Abgeleitete Merkmale einer Anzeige; dieselbe Berechnung für UI, Export und Modelle."""
 
     city: str | None = None
+    postal_code: str | None = None
     region: str | None = None
+    lat: float | None = Field(default=None, description="Position der Stelle (ggf. Stadtmitte)")
+    lon: float | None = None
+    position_estimated: bool = Field(
+        default=False, description="Position aus der Stadtmitte anderer Anzeigen geschätzt"
+    )
     distance_km: float | None = None
     distance_estimated: bool = Field(
         default=False, description="Ort ohne eigene Koordinaten: Stadtmitte aus anderen Anzeigen"

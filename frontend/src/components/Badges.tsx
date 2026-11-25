@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ApplicationStatus, JobSource } from "../api/types";
 import { SOURCE_LABEL, STATUS_LABEL } from "../lib/labels";
 
@@ -39,11 +40,20 @@ export function Priority({ value, onChange }: { value: number; onChange?: (v: nu
 }
 
 /** Metadaten als einzelne Elemente; Trenner kommen aus dem CSS. */
-export function MetaLine({ items, className = "card__meta" }: { items: (string | null | undefined)[]; className?: string }) {
+export function MetaLine({
+  items,
+  lead,
+  className = "card__meta",
+}: {
+  items: (string | null | undefined)[];
+  lead?: ReactNode;
+  className?: string;
+}) {
   const shown = items.filter((m): m is string => Boolean(m));
-  if (shown.length === 0) return null;
+  if (shown.length === 0 && !lead) return null;
   return (
     <p className={className}>
+      {lead && <span>{lead}</span>}
       {shown.map((m) => (
         <span key={m}>{m}</span>
       ))}

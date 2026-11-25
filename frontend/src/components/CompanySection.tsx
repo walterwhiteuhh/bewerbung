@@ -2,6 +2,7 @@ import { api } from "../api/client";
 import { useMutate } from "../api/hooks";
 import type { Company, CompanyUpdate } from "../api/types";
 import { CompanyLogo } from "./CompanyLogo";
+import { SocialLinks } from "./SocialLinks";
 import { useToast } from "./Toast";
 
 const LOGO_SOURCE_LABEL: Record<string, string> = {
@@ -26,7 +27,7 @@ export function CompanySection({ company }: { company: Company }) {
 
   const loadLogo = (quiet = false) =>
     fetchLogo.mutate(undefined, {
-      onSuccess: () => toast("Logo von der Website übernommen"),
+      onSuccess: (c) => toast(c.logo_source === "website" ? "Logo und Profile von der Website übernommen" : "Profile von der Website übernommen"),
       onError: (e) => toast(quiet ? `Website gespeichert, aber ${e.message.replace(/^Logo/, "kein Logo")}` : e.message, "error"),
     });
 
@@ -38,6 +39,8 @@ export function CompanySection({ company }: { company: Company }) {
       },
       onError: (e) => toast(e.message, "error"),
     });
+
+  const socialText = Object.values(company.social_links ?? {}).join(" ");
 
   const blurSave = (field: keyof CompanyUpdate, current: string | null) => (e: React.FocusEvent<HTMLInputElement>) => {
     const value = e.target.value.trim();
@@ -64,7 +67,7 @@ export function CompanySection({ company }: { company: Company }) {
         <div className="company__actions">
           {company.website && (
             <button type="button" className="btn" onClick={() => loadLogo()} disabled={fetchLogo.isPending}>
-              {fetchLogo.isPending ? "Lade …" : company.logo_url ? "Logo neu laden" : "Logo laden"}
+              {fetchLogo.isPending ? "Lade …" : company.logo_url ? "Von Website neu laden" : "Logo & Profile laden"}
             </button>
           )}
           {company.logo_url && (
@@ -74,6 +77,7 @@ export function CompanySection({ company }: { company: Company }) {
           )}
         </div>
       </div>
+      <SocialLinks links={company.social_links} />
       <div className="facts facts--edit">
         <label className="fact">
           <span>Website</span>
@@ -94,7 +98,21 @@ export function CompanySection({ company }: { company: Company }) {
           <input key={`l${company.location}`} defaultValue={company.location ?? ""} placeholder="Ort" onBlur={blurSave("location", company.location)} />
         </label>
       </div>
-      <p className="hint">Gilt für alle Stellen dieser Firma.</p>
+      <div className="facts facts--edit facts--one">
+        <label className="fact">
+          <span>Social Media</span>
+          <input
+            key={`s${socialText}`}
+            defaultValue={socialText}
+            placeholder="linkedin.com/company/… xing.com/pages/…"
+            onBlur={(e) => {
+              const value = e.target.value.trim();
+              if (value !== socialText) save({ social_links: value ? value.split(/[\s,]+/) : [] });
+            }}
+          />
+        </label>
+      </div>
+      <p className="hint">Gilt für alle Stellen dieser Firma. Profile werden auch aus der Anzeige und von der Website übernommen.</p>
     </section>
   );
 }

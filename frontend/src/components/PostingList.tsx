@@ -4,6 +4,9 @@ import { formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 import { TagList } from "./TagInput";
+import { usePostingInsights } from "../api/hooks";
+import { PlaceHover } from "./PlaceCard";
+import { useState } from "react";
 
 interface Props {
   items: PostingListItem[];
@@ -60,7 +63,9 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
                 <CompanyLogo name={p.company?.name} url={p.company?.logo_url} />
                 <span>{p.company?.name ?? "Firma unbekannt"}</span>
               </p>
-              <MetaLine items={[p.location, p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]} />
+              <MetaLine
+                lead={p.location ? <PostingPlace id={p.id} location={p.location} company={p.company?.name ?? null} logo={p.company?.logo_url ?? null} /> : null}
+                items={[p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]} />
               <TagList tags={p.tags} active={activeTags} />
               <div className="card__bottom">
                 <span className="muted">{relativeTime(p.updated_at)}</span>
@@ -71,5 +76,16 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
         );
       })}
     </ul>
+  );
+}
+
+/** Ort einer gemerkten Stelle; Merkmale werden erst beim Öffnen der Karte geladen. */
+function PostingPlace({ id, location, company, logo }: { id: number; location: string; company: string | null; logo: string | null }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading } = usePostingInsights(id, open);
+  return (
+    <PlaceHover interactive={false} onOpenChange={setOpen} info={{ location, companyName: company, companyLogo: logo, features: data?.features, loading: open && isLoading }}>
+      {location}
+    </PlaceHover>
   );
 }

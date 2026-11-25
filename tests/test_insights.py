@@ -111,6 +111,8 @@ def test_search_hits_carry_features(client_with_hits: TestClient) -> None:
     by_ext = {h["listing"]["external_id"]: h for h in run["hits"]}
     f = by_ext["a1"]["features"]
     assert f["distance_km"] == 0
+    assert (f["lat"], f["lon"], f["postal_code"]) == (53.55, 9.99, "20095")
+    assert f["position_estimated"] is False
     assert f["within_max_distance"] is True
     assert sorted(f["portals"]) == ["adzuna", "arbeitsagentur"]  # gleiche Stelle, 2 Portale
     assert f["company"]["listings"] == 3  # ACME GmbH / ACME / Acme GmbH = eine Firma
@@ -123,9 +125,11 @@ def test_search_hits_carry_features(client_with_hits: TestClient) -> None:
     # Adzuna ohne Koordinaten: Entfernung über die Stadtmitte aus anderen Anzeigen geschätzt.
     z = by_ext["z1"]["features"]
     assert z["distance_estimated"] is True and z["distance_km"] == 0
+    assert z["position_estimated"] is True and z["lat"] == pytest.approx(53.55)
 
     profile = c.get("/api/profile").json()
     assert profile["home_located"] is True
+    assert profile["home_lat"] == pytest.approx(53.55)
 
 
 def test_posting_insights_and_export(client_with_hits: TestClient) -> None:

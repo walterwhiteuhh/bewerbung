@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CompanyLogo } from "./CompanyLogo";
 import { FeatureChips } from "./Insights";
+import { PlaceHover } from "./PlaceCard";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
@@ -432,7 +433,15 @@ function HitCard({
         <CompanyLogo name={l.company_name} url={l.company_logo_url} />
         <span>{l.company_name ?? "Firma unbekannt"}</span>
       </p>
-      <MetaLine items={[l.location, l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
+      <MetaLine
+        lead={
+          l.location || features?.city ? (
+            <PlaceHover info={{ location: l.location, companyName: l.company_name, companyLogo: l.company_logo_url, features }}>
+              {l.location ?? features?.city}
+            </PlaceHover>
+          ) : null
+        }
+        items={[l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
       {features && <FeatureChips features={features} />}
       {l.description && (
         <p className={`card__desc ${expanded ? "is-open" : ""}`} onClick={() => setExpanded((x) => !x)}>

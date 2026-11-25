@@ -38,6 +38,14 @@ _PORTAL_SUFFIXES = (
     "jooble.org",
     "adzuna.de",
     "adzuna.com",
+    # Soziale Netzwerke: werden als Profile erfasst (domain/socials.py), nicht als Website.
+    "instagram.com",
+    "facebook.com",
+    "youtube.com",
+    "x.com",
+    "twitter.com",
+    "tiktok.com",
+    "github.com",
 )
 
 

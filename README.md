@@ -182,6 +182,17 @@ sortieren; jede Stelle zeigt „Zusammenhänge“ (`GET /api/postings/{id}/insig
 `GET /api/insights/listings.csv` exportiert alle Anzeigen mit denselben Merkmalen und dem
 Bewerbungsstatus als Label, als Ausgangspunkt für ein späteres Ranking-Modell.
 
+**Info-Karte am Ort:** Beim Überfahren (Touch: Tippen) des Orts auf Treffer- und Stellenkarten
+erscheint eine Karte mit Minikarte (OpenStreetMap-Kacheln, Wohnort und Stelle), Entfernung,
+Firmenaktivität, Website und Social-Media-Profilen sowie Links „Karte öffnen“ und „Route“.
+Die Kacheln lädt der Browser direkt von `tile.openstreetmap.org`; ohne Internet bleibt die Karte
+schraffiert, Markierungen und Entfernung stimmen trotzdem.
+
+**Social-Media-Profile** (`companies.social_links`, `domain/socials.py`): LinkedIn, XING, kununu,
+Instagram, Facebook, YouTube, X, TikTok und GitHub werden aus JSON-LD `sameAs` der Anzeigen und
+beim Laden von der Firmen-Website aus deren Links übernommen (Teilen-Links und einzelne Beiträge
+zählen nicht) und lassen sich im Firmenbereich von Hand pflegen.
+
 ### Neue Quelle anbinden
 
 ```python
