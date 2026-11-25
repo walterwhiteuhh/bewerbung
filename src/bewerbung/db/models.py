@@ -77,8 +77,13 @@ class Company(TimestampMixin, Base):
     # Normalisierter Schlüssel zum Zusammenführen ("SAP SE" vs. "sap se ").
     name_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     website: Mapped[str | None] = mapped_column(String(2048))
-    # Externe URL (Portal/Karriereseite) oder eigener Proxy-Pfad /api/logos/...
+    industry: Mapped[str | None] = mapped_column(String(120))
+    location: Mapped[str | None] = mapped_column(String(255))
+    # Externe URL (Portal/Karriereseite) oder eigener Pfad /api/logos/...
     logo_url: Mapped[str | None] = mapped_column(String(2048))
+    # Herkunft des Logos: portal | website | manual; erlaubt späteres gezieltes Neuladen.
+    logo_source: Mapped[str | None] = mapped_column(String(16))
+    logo_fetched_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     postings: Mapped[list[JobPosting]] = relationship(back_populates="company")
 

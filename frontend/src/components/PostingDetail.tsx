@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { CompanyLogo } from "./CompanyLogo";
+import { CompanySection } from "./CompanySection";
 
 import { api } from "../api/client";
 import { useLetters, useMutate, usePosting } from "../api/hooks";
@@ -74,6 +75,8 @@ export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }:
         <Fact label="Erfasst" value={formatDate(p.created_at)} />
         {p.external_id && <Fact label="Job-ID" value={p.external_id} />}
       </section>
+
+      {p.company && <CompanySection company={p.company} />}
 
       <TagsSection posting={p} />
 

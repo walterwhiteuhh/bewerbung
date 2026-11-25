@@ -1196,3 +1196,12 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
 }
 .detail__title-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .detail__title-row h2 { min-width: 0; }
+
+/* --- Firma in der Detailansicht ------------------------------------------- */
+.company__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.company__title { flex: 1 1 180px; min-width: 0; }
+.company__title h3 { overflow-wrap: anywhere; }
+.company__title p { font-size: 0.88rem; }
+.company__title a { color: var(--accent); text-decoration: none; }
+.company__title a:hover { text-decoration: underline; }
+.company__actions { display: flex; gap: 6px; flex-wrap: wrap; }

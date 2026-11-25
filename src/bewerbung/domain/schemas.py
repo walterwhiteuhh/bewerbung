@@ -145,6 +145,19 @@ class CompanyRead(_Schema):
     id: int
     name: str
     logo_url: str | None = None
+    website: str | None = None
+    industry: str | None = None
+    location: str | None = None
+    logo_source: str | None = None
+    posting_count: int | None = Field(default=None, description="Nur in der Firmenliste")
+
+
+class CompanyUpdate(_Schema):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    website: OptStr = Field(default=None, max_length=2048)
+    industry: OptStr = Field(default=None, max_length=120)
+    location: OptStr = Field(default=None, max_length=255)
+    logo_url: OptStr = Field(default=None, max_length=2048, description="Leer = Logo entfernen")
 
 
 class ApplicationSummary(_Schema):

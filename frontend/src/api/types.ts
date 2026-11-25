@@ -43,6 +43,19 @@ export interface Company {
   id: number;
   name: string;
   logo_url: string | null;
+  website: string | null;
+  industry: string | null;
+  location: string | null;
+  logo_source: "portal" | "website" | "manual" | null;
+  posting_count?: number | null;
+}
+
+export interface CompanyUpdate {
+  name?: string;
+  website?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  logo_url?: string | null;
 }
 
 export interface ApplicationSummary {
