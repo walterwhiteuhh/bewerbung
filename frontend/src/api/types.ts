@@ -154,6 +154,7 @@ export interface ImportPreview {
   description: string | null;
   posted_at: string | null;
   raw_payload: Record<string, unknown>;
+  suggested_tags: string[];
   warnings: string[];
 }
 
@@ -256,4 +257,63 @@ export interface SearchProfile {
   remote_only: boolean;
   sources: JobSource[];
   created_at: string;
+}
+
+// --- Anschreiben -----------------------------------------------------------
+
+export interface Profile {
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  headline: string | null;
+  summary: string | null;
+  skills: string[];
+  cv_text: string | null;
+  signature: string | null;
+  updated_at?: string | null;
+}
+
+export type GeneratorName = "claude" | "openai" | "gemini" | "template";
+export type LetterTone = "formell" | "modern" | "locker";
+export type LetterLength = "kurz" | "normal" | "ausfuehrlich";
+
+export interface GeneratorInfo {
+  name: GeneratorName;
+  label: string;
+  available: boolean;
+  reason: string | null;
+  model: string | null;
+}
+
+export interface LetterRequest {
+  generator: "auto" | GeneratorName;
+  tone: LetterTone;
+  length: LetterLength;
+  extra_notes: string | null;
+}
+
+export interface CoverLetter {
+  id: number;
+  posting_id: number;
+  version: number;
+  status: "draft" | "final";
+  body: string;
+  edited: boolean;
+  generator: GeneratorName;
+  model: string | null;
+  tone: LetterTone;
+  input_snapshot: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LetterContext {
+  portal: string | null;
+  tags: string[];
+  suggested_tags: string[];
+  description_excerpt: string | null;
+  matching_skills: string[];
+  profile_complete: boolean;
+  missing_profile_fields: string[];
 }

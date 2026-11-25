@@ -63,6 +63,8 @@ frontend/      React + TypeScript + Vite, TanStack Query, mobile-first CSS
 | `application_status_events` | **Append-only** Status-Historie, bitemporal: `occurred_at` (fachlich, rückdatierbar) und `recorded_at` (Erfassung) |
 | `tags` / `posting_tags` | Hashtags. `tags.key` ist der normalisierte Name ("Python" = "python"); Zuordnungen werden beim Entfernen mit `removed_at` beendet statt gelöscht, `origin` sagt, ob sie von Hand oder aus einer Notiz (`#tag`) kamen |
 | `notes` | Notizen pro Bewerbung |
+| `applicant_profiles` | Eigenes Profil (eine Zeile) |
+| `cover_letters` | Anschreiben-Fassungen je Stelle: `body_generated` bleibt unverändert, `body` ist editierbar; `input_snapshot`, `generator`, `model`, `prompt_version`, Tokens und Dauer für spätere Auswertung |
 | `listings` | Anzeige je Portal (Rohsicht); `posting_id` NULL = Suchtreffer, sonst verknüpfte Stelle |
 | `search_profiles` | Gespeicherte Suchen |
 | `search_runs` / `search_hits` | Append-only Protokoll jedes Suchlaufs mit Treffern und Rang (Basis für späteres Relevanz-Ranking: gezeigt → gemerkt) |
@@ -96,6 +98,26 @@ Treffer werden als `listings` gespeichert (`first_seen_at`/`last_seen_at`, `cont
 jeder Lauf mit Rang in `search_runs`/`search_hits`. „Merken“ legt Stelle und Bewerbung an und
 verknüpft das Listing. Suchen lassen sich als Profil speichern.
 
+### Anschreiben
+
+In jeder Stelle öffnet „Anschreiben erstellen“ eine Werkstatt. Portal (z. B. StepStone, LinkedIn),
+Firma, Hashtags, Beschreibung und die Skills aus „Mein Profil“, die zur Anzeige passen, werden
+automatisch erkannt und an den Generator gegeben. Ton und Länge sind wählbar, jede Fassung wird
+versioniert gespeichert (Original und bearbeiteter Text getrennt, plus Eingaben-Snapshot,
+Modell, Prompt-Version und Tokens). Eine Fassung pro Stelle kann als „final“ markiert werden.
+
+Für KI-Texte einen oder mehrere Keys in die `.env` im Projektordner eintragen:
+
+| Anbieter | Eintrag in `.env` | Modell ändern (optional) |
+|---|---|---|
+| Claude (Anthropic) | `ANTHROPIC_API_KEY=...` | `BEWERBUNG_COVER_LETTER_MODEL=claude-opus-5-5` |
+| ChatGPT (OpenAI) | `OPENAI_API_KEY=...` | `BEWERBUNG_OPENAI_MODEL=gpt-5` |
+| Gemini (Google AI Studio) | `GEMINI_API_KEY=...` | `BEWERBUNG_GEMINI_MODEL=gemini-2.5-pro` |
+
+Danach die App neu starten. „Automatisch“ nimmt den ersten Anbieter mit Key (Reihenfolge wie oben),
+im Dialog lässt sich jeder einzeln wählen. Ohne Key entsteht ein Entwurf aus einer Vorlage.
+Hinweis: Beim Erstellen gehen Stellendaten und Profil an den gewählten Anbieter.
+
 ### Neue Quelle anbinden
 
 ```python
@@ -128,5 +150,10 @@ default_registry().register(XingAdapter())
 | GET | `/api/search/runs` · `/runs/{id}` | Suchhistorie |
 | GET/POST/DELETE | `/api/search/profiles` | Gespeicherte Suchen |
 | POST | `/api/listings/{id}/save` | Treffer merken |
+| GET/PUT | `/api/profile` | Eigenes Profil (Grundlage der Anschreiben) |
+| GET | `/api/letters/generators` | Claude, ChatGPT, Gemini, Vorlage und ob ein Key da ist |
+| GET | `/api/postings/{id}/letter-context` | Erkanntes Portal, Hashtags, passende Skills |
+| GET/POST | `/api/postings/{id}/letters` | Fassungen auflisten / neue erzeugen |
+| PATCH | `/api/letters/{id}` | Text bearbeiten, als final markieren |
 
 Vollständig und interaktiv unter `/docs`.

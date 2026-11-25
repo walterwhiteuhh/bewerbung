@@ -8,6 +8,10 @@ export const keys = {
   posting: (id: number) => ["posting", id] as const,
   stats: ["stats"] as const,
   tags: ["tags"] as const,
+  profile: ["profile"] as const,
+  generators: ["generators"] as const,
+  letters: (postingId: number) => ["letters", postingId] as const,
+  letterContext: (postingId: number) => ["letter-context", postingId] as const,
 };
 
 export const usePostings = (f: PostingFilter) =>
@@ -20,6 +24,13 @@ export const useStats = () => useQuery({ queryKey: keys.stats, queryFn: api.stat
 
 export const useTags = () => useQuery({ queryKey: keys.tags, queryFn: api.tags, staleTime: 30_000 });
 
+export const useProfile = () => useQuery({ queryKey: keys.profile, queryFn: api.profile });
+export const useGenerators = () => useQuery({ queryKey: keys.generators, queryFn: api.generators, staleTime: 60_000 });
+export const useLetters = (postingId: number) =>
+  useQuery({ queryKey: keys.letters(postingId), queryFn: () => api.letters(postingId) });
+export const useLetterContext = (postingId: number) =>
+  useQuery({ queryKey: keys.letterContext(postingId), queryFn: () => api.letterContext(postingId) });
+
 /** Jede Änderung macht Listen, Detail und Kennzahlen ungültig: einfach und immer konsistent. */
 export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>) {
   const qc = useQueryClient();
@@ -30,6 +41,9 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
       void qc.invalidateQueries({ queryKey: ["posting"] });
       void qc.invalidateQueries({ queryKey: keys.stats });
       void qc.invalidateQueries({ queryKey: keys.tags });
+      void qc.invalidateQueries({ queryKey: ["letters"] });
+      void qc.invalidateQueries({ queryKey: ["letter-context"] });
+      void qc.invalidateQueries({ queryKey: keys.profile });
     },
   });
 }

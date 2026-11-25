@@ -75,6 +75,7 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
         salary_min: s.salary_min || (preview.salary_min?.toString() ?? ""),
         salary_max: s.salary_max || (preview.salary_max?.toString() ?? ""),
         description: s.description || preview.description || "",
+        tags: s.tags.length ? s.tags : preview.suggested_tags,
       }));
       if (preview.method !== "none") toast("Daten aus der Anzeige übernommen");
     } catch (err) {

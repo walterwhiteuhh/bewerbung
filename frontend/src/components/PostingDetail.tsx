@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import { useMutate, usePosting } from "../api/hooks";
+import { useLetters, useMutate, usePosting } from "../api/hooks";
 import type { Application, ApplicationStatus, PostingDetail as Posting } from "../api/types";
 import { formatDate, formatDateTime, formatSalary, isoToLocalDate, localDateToIso } from "../lib/format";
 import { EXITS, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
+import { Dialog } from "./Dialog";
+import { GENERATOR_LABEL, LetterStudio } from "./LetterStudio";
 import { TagInput } from "./TagInput";
 import { useToast } from "./Toast";
 
@@ -14,9 +16,10 @@ interface Props {
   onClose: () => void;
   onEdit: (p: Posting) => void;
   showClose: boolean;
+  onOpenProfile: () => void;
 }
 
-export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
+export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }: Props) {
   const { data: p, isLoading, error } = usePosting(id);
   const toast = useToast();
   const archive = useMutate((archived: boolean) => (archived ? api.archivePosting(id) : api.restorePosting(id)));
@@ -69,6 +72,8 @@ export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
 
       <TagsSection posting={p} />
 
+      <LetterSection posting={p} onOpenProfile={onOpenProfile} />
+
       {app && <ApplicationFields key={app.id} app={app} />}
 
       {p.description && (
@@ -95,6 +100,35 @@ export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
         </button>
       </footer>
     </article>
+  );
+}
+
+/** Kurzer Stand der Anschreiben; die eigentliche Arbeit passiert im großen Dialog. */
+function LetterSection({ posting, onOpenProfile }: { posting: Posting; onOpenProfile: () => void }) {
+  const [open, setOpen] = useState(false);
+  const { data: letters = [] } = useLetters(posting.id);
+  const final = letters.find((l) => l.status === "final");
+  const latest = final ?? letters[0];
+  return (
+    <section className="section letter-teaser">
+      <div className="letter-teaser__text">
+        <h3>Anschreiben</h3>
+        {latest ? (
+          <p className="muted">
+            {letters.length} {letters.length === 1 ? "Fassung" : "Fassungen"}
+            {final ? ` · final: V${final.version}` : ` · zuletzt V${latest.version}`} ({GENERATOR_LABEL[latest.generator] ?? latest.generator})
+          </p>
+        ) : (
+          <p className="muted">Passend zu Stelle, Beschreibung, Hashtags und Portal erstellen.</p>
+        )}
+      </div>
+      <button type="button" className="btn btn--primary" onClick={() => setOpen(true)}>
+        {latest ? "Öffnen" : "Anschreiben erstellen"}
+      </button>
+      <Dialog open={open} title={`Anschreiben · ${posting.title}`} onClose={() => setOpen(false)} wide>
+        <LetterStudio posting={posting} onOpenProfile={onOpenProfile} />
+      </Dialog>
+    </section>
   );
 }
 

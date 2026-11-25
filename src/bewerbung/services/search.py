@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from bewerbung.db.models import JobPosting, Listing, SearchHit, SearchProfile, SearchRun
 from bewerbung.db.types import utcnow
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
+from bewerbung.domain.keywords import suggest_tags
 from bewerbung.domain.schemas import (
     PostingCreate,
     ProviderInfo,
@@ -23,6 +24,7 @@ from bewerbung.domain.schemas import (
 )
 from bewerbung.search.base import ListingDraft, SearchProvider, SearchQuery
 from bewerbung.services import postings
+from bewerbung.services.tags import add_tags
 from bewerbung.sources import SourceRegistry
 
 logger = logging.getLogger(__name__)
@@ -206,6 +208,16 @@ def save_listing(
         posting = postings.create_posting(session, registry, create, with_listing=False)
     except DuplicatePostingError as dup:
         posting = postings.get_posting(session, dup.existing_id)
+    else:
+        auto = suggest_tags(
+            title=listing.title,
+            description=listing.description,
+            location=listing.location,
+            remote_type=listing.remote_type,
+            employment_type=listing.employment_type,
+        )
+        if auto:
+            add_tags(session, posting, auto, origin="auto")
     listing.posting_id = posting.id
     session.flush()
     return postings.get_posting(session, posting.id)

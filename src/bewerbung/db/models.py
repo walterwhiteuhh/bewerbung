@@ -180,10 +180,8 @@ class PostingTag(Base):
     posting_id: Mapped[int] = mapped_column(
         ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    tag_id: Mapped[int] = mapped_column(
-        ForeignKey("tags.id", ondelete="CASCADE"), nullable=False
-    )
-    # Woher die Zuordnung kam: "manual" (Formular/Detail) oder "note" (#tag in einer Notiz).
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
+    # Herkunft: "manual" (Formular/Detail), "note" (#tag in Notiz), "auto" (aus der Beschreibung).
     origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
     added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
@@ -381,3 +379,58 @@ class SearchHit(Base):
 
     run: Mapped[SearchRun] = relationship(back_populates="hits")
     listing: Mapped[Listing] = relationship(lazy="joined")
+
+
+class ApplicantProfile(TimestampMixin, Base):
+    """Bewerberprofil als Grundlage für Anschreiben (aktuell genau eins)."""
+
+    __tablename__ = "applicant_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str | None] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(64))
+    address: Mapped[str | None] = mapped_column(String(500))
+    headline: Mapped[str | None] = mapped_column(String(255))
+    summary: Mapped[str | None] = mapped_column(Text)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    cv_text: Mapped[str | None] = mapped_column(Text)
+    signature: Mapped[str | None] = mapped_column(Text)
+
+
+class CoverLetter(TimestampMixin, Base):
+    """Eine Anschreiben-Version zu einer Stelle.
+
+    ``body_generated`` bleibt unverändert, ``body`` ist die bearbeitete Fassung: die
+    Differenz zeigt später, wie viel nachgebessert werden musste. ``input_snapshot``
+    hält genau die Eingaben fest (Stelle, Hashtags, Profil, Optionen), mit denen der
+    Text entstand, damit Ergebnisse reproduzierbar und auswertbar bleiben.
+    """
+
+    __tablename__ = "cover_letters"
+    __table_args__ = (
+        Index("uq_cover_letters_posting_version", "posting_id", "version", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    posting_id: Mapped[int] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False
+    )
+    application_id: Mapped[int | None] = mapped_column(
+        ForeignKey("applications.id", ondelete="SET NULL"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    # "draft" oder "final" (die verschickte Fassung).
+    status: Mapped[str] = mapped_column(String(16), default="draft", nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    body_generated: Mapped[str] = mapped_column(Text, nullable=False)
+    generator: Mapped[str] = mapped_column(String(32), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(64))
+    prompt_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    tone: Mapped[str] = mapped_column(String(32), nullable=False)
+    input_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+
+    posting: Mapped[JobPosting] = relationship()
