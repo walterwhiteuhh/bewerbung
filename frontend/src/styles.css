@@ -1497,22 +1497,76 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
 .placecard.is-sheet .minimap { height: 180px; }
 
 /* --- Segelschiff (leerer Zustand) ---------------------------------------------- */
-.ship { width: min(280px, 75%); height: auto; overflow: hidden; border-radius: 18px; }
-.ship--sm { width: min(180px, 55%); }
-.ship__sky { fill: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
-.ship__sun { fill: color-mix(in srgb, var(--marker) 75%, transparent); }
+.ship-btn {
+  display: block; width: min(280px, 75%); padding: 0; border: 0; border-radius: 18px;
+  background: none; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ship-btn--sm { width: min(180px, 55%); }
+.ship-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.ship {
+  display: block; width: 100%; height: auto; overflow: hidden; border-radius: 18px;
+  /* Tag (Standard): Farben aus dem Theme, damit hell und dunkel passen. */
+  --sky: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  --sun: color-mix(in srgb, var(--marker) 75%, transparent);
+  --sea1: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  --sea2: color-mix(in srgb, var(--accent) 45%, var(--surface));
+  --sea3: color-mix(in srgb, var(--accent) 70%, var(--band));
+  --coast: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  --ink: var(--text);
+  --sailcloth: var(--surface);
+}
+.ship[data-phase="dawn"] {
+  --sky: color-mix(in srgb, #f4a6a0 32%, var(--surface));
+  --sun: #f7b267;
+  --sea1: color-mix(in srgb, #c98fb4 40%, var(--surface));
+  --coast: color-mix(in srgb, #8d6f9e 30%, var(--surface));
+}
+.ship[data-phase="dusk"] {
+  --sky: color-mix(in srgb, #f08a4b 38%, var(--surface));
+  --sun: #e8572f;
+  --sea1: color-mix(in srgb, #b4607a 45%, var(--surface));
+  --sea2: color-mix(in srgb, #5b5aa6 55%, var(--surface));
+  --coast: color-mix(in srgb, #5b3f6e 55%, var(--surface));
+}
+.ship[data-phase="night"] {
+  --sky: #101b33; --sea1: #1c2c52; --sea2: #253b70; --sea3: #33508f;
+  --coast: #0b1326; --ink: #e8ecf6; --sailcloth: #2a3657;
+}
+.ship__sky { fill: var(--sky); }
+.ship__sun { fill: var(--sun); }
+.ship[data-phase="dawn"] .ship__sun { transform: translateY(46px); }
+.ship[data-phase="dusk"] .ship__sun { transform: translate(-150px, 50px); }
+.ship[data-phase="night"] .ship__sun, .ship:not([data-phase="night"]) :is(.ship__moon, .ship__stars) { opacity: 0; }
+.ship__moon circle { fill: #f3e7b5; }
+.ship__moon .ship__moon-cut { fill: var(--sky); }
+.ship__stars circle { fill: #fdf6d8; }
 .ship__gull path { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
-.ship__wave--back { fill: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
-.ship__wave--mid { fill: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
-.ship__wave--front { fill: color-mix(in srgb, var(--accent) 70%, var(--band)); }
-/* --text ist hell im Dunkelmodus und dunkel im Hellmodus: Schiff bleibt immer sichtbar. */
-.ship__mast { stroke: var(--text); stroke-width: 3.5; stroke-linecap: round; }
-.ship__sail { fill: var(--surface); stroke: var(--text); stroke-width: 2.2; stroke-linejoin: round; }
-.ship__sail--front { fill: color-mix(in srgb, var(--marker) 30%, var(--surface)); }
+.ship[data-phase="night"] .ship__gull { opacity: 0; }
+.ship__coast path { fill: var(--coast); }
+.ship__coast .ship__tower { fill: var(--ink); opacity: 0.55; }
+.ship__lamp, .ship__lantern { fill: #ffd34d; opacity: 0; }
+.ship__coast .ship__beam { fill: #ffe38a; opacity: 0; }
+.ship:is([data-phase="night"], [data-phase="dusk"]) :is(.ship__lamp, .ship__lantern) { opacity: 1; }
+.ship[data-phase="night"] .ship__coast .ship__beam { opacity: 0.2; }
+.ship__wave--back { fill: var(--sea1); }
+.ship__wave--mid { fill: var(--sea2); }
+.ship__wave--front { fill: var(--sea3); }
+/* --ink ist hell im Dunkelmodus und bei Nacht: Schiff bleibt immer sichtbar. */
+.ship__mast { stroke: var(--ink); stroke-width: 3.5; stroke-linecap: round; }
+.ship__sail { fill: var(--sailcloth); stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
+.ship__sail--front { fill: color-mix(in srgb, var(--marker) 30%, var(--sailcloth)); }
 .ship__flag { fill: var(--marker); }
-.ship__hull { fill: var(--text); }
+.ship__hull { fill: var(--ink); }
 .ship__stripe { stroke: var(--marker); stroke-width: 3; stroke-linecap: round; }
-.ship__boat, .ship__rock, .ship__wave, .ship__gull { transform-box: view-box; will-change: transform; }
+/* Wal wartet ohne Animation unter Wasser (auch bei reduzierter Bewegung). */
+.ship__whale { transform: translateY(34px); }
+.ship__whale path:not(.ship__spout) { fill: color-mix(in srgb, var(--ink) 80%, var(--sea2)); }
+.ship__spout { fill: none; stroke: #cfe6ff; stroke-width: 1.6; stroke-linecap: round; opacity: 0; }
+.ship__bubble rect { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+.ship__bubble text { fill: var(--text); font: 700 11px var(--font-body); }
+.ship__boat, .ship__hop, .ship__rock, .ship__wave, .ship__gull, .ship__whale, .ship__spout,
+.ship__beam, .ship__bubble, .ship__sun { transform-box: view-box; }
+.ship__boat, .ship__rock, .ship__wave { will-change: transform; }
 
 @media (prefers-reduced-motion: no-preference) {
   .ship__wave--back { animation: ship-drift 9s linear infinite; }
@@ -1521,8 +1575,38 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
   .ship__boat { animation: ship-bob 3s ease-in-out infinite; }
   .ship__rock { transform-origin: 120px 120px; animation: ship-rock 4s ease-in-out infinite; }
   .ship__gull { animation: ship-gull 7s ease-in-out infinite; }
+  .ship__whale { animation: ship-whale 26s ease-in-out 6s infinite; }
+  .ship__spout { transform-origin: 196px 106px; animation: ship-spout 26s ease-out 6s infinite; }
+  .ship[data-phase="night"] .ship__stars circle { animation: ship-twinkle 2.4s ease-in-out infinite; }
+  .ship[data-phase="night"] .ship__beam { transform-origin: 26px 84px; animation: ship-beam 6s ease-in-out infinite; }
+  .ship__hop.is-hopping { transform-origin: 120px 124px; animation: ship-hop 0.9s cubic-bezier(.3,.7,.4,1); }
+  .ship__bubble { transform-origin: 64px 30px; animation: ship-bubble 2.6s ease-out forwards; }
+  .ship-btn:hover .ship__flag { animation: ship-flag 0.5s ease-in-out infinite alternate; transform-origin: 120px 31px; transform-box: view-box; }
 }
 @keyframes ship-drift { from { transform: translateX(0); } to { transform: translateX(-240px); } }
 @keyframes ship-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
 @keyframes ship-rock { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(6deg); } }
 @keyframes ship-gull { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(14px, -5px); } }
+@keyframes ship-whale {
+  0%, 78%, 100% { transform: translateY(34px); }
+  84%, 92% { transform: translateY(0); }
+}
+@keyframes ship-spout {
+  0%, 85%, 93%, 100% { opacity: 0; transform: scale(0.3); }
+  88% { opacity: 1; transform: scale(1); }
+  91% { opacity: 0.6; transform: scale(1.15); }
+}
+@keyframes ship-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes ship-beam { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(10deg); } }
+@keyframes ship-hop {
+  0% { transform: none; }
+  35% { transform: translateY(-24px) rotate(-12deg); }
+  70% { transform: translateY(3px) rotate(5deg); }
+  100% { transform: none; }
+}
+@keyframes ship-bubble {
+  0% { opacity: 0; transform: scale(0.6); }
+  12%, 80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes ship-flag { to { transform: scaleY(0.7) skewY(6deg); } }

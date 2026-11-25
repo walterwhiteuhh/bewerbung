@@ -5,7 +5,7 @@ import { company, features, rating } from "../test/fixtures";
 import { MetaLine, Priority } from "./Badges";
 import { RatingBadge } from "./EmployerRating";
 import { distanceLabel, FeatureChips } from "./Insights";
-import { ShipScene } from "./ShipScene";
+import { phaseAt, SAYINGS, ShipScene } from "./ShipScene";
 import { SocialLinks } from "./SocialLinks";
 
 describe("Merkmale", () => {
@@ -85,11 +85,30 @@ describe("Bausteine", () => {
   });
 
   it("Segelschiff ist zugänglich beschriftet und hat nahtlose Wellen", () => {
-    render(<ShipScene />);
-    const svg = screen.getByRole("img", { name: "Segelschiff auf bewegter See" });
-    const waves = svg.querySelectorAll(".ship__wave");
+    render(<ShipScene phase="day" />);
+    const ship = screen.getByRole("button", { name: /Segelschiff auf bewegter See/ });
+    const waves = ship.querySelectorAll(".ship__wave");
     expect(waves).toHaveLength(3);
     // 8 Perioden à 60 = 480 = doppelte Szenenbreite, Voraussetzung für die Endlos-Animation
     for (const w of waves) expect(w.getAttribute("d")?.match(/q15/g)).toHaveLength(8);
+  });
+
+  it("folgt der Tageszeit", () => {
+    expect([4, 5, 7, 8, 16, 17, 20, 21, 0].map(phaseAt)).toEqual([
+      "night", "dawn", "dawn", "day", "day", "dusk", "dusk", "night", "night",
+    ]);
+    const { container } = render(<ShipScene phase="night" />);
+    expect(container.querySelector(".ship")).toHaveAttribute("data-phase", "night");
+  });
+
+  it("ruft beim Antippen reihum Seemannssprüche", async () => {
+    const user = userEvent.setup();
+    render(<ShipScene phase="day" />);
+    const ship = screen.getByRole("button", { name: /Segelschiff/ });
+    expect(ship.querySelector(".ship__bubble")).toBeNull();
+    for (const saying of [...SAYINGS, SAYINGS[0]]) {
+      await user.click(ship);
+      expect(ship.querySelector(".ship__bubble")).toHaveTextContent(saying);
+    }
   });
 });
