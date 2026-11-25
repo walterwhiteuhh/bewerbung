@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import type { JobSource, Listing, SearchParams, SearchRun } from "../api/types";
 import { formatDate, formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL, SOURCE_LABEL } from "../lib/labels";
-import { SourceTag } from "./Badges";
+import { MetaLine, SourceTag } from "./Badges";
 import { useToast } from "./Toast";
 
 const RADII = [0, 10, 25, 50, 100];
@@ -253,9 +253,6 @@ function HitCard({
     onError: (e) => toast(e.message, "error"),
   });
   const salary = l.salary_min || l.salary_max ? formatSalary(l.salary_min, l.salary_max, l.salary_currency ?? "EUR") : null;
-  const meta = [l.location, l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     <li className="card card--hit">
@@ -266,7 +263,7 @@ function HitCard({
       </div>
       <h3 className="card__title">{l.title}</h3>
       <p className="card__company">{l.company_name ?? "Firma unbekannt"}</p>
-      {meta && <p className="card__meta">{meta}</p>}
+      <MetaLine items={[l.location, l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
       {l.description && (
         <p className={`card__desc ${expanded ? "is-open" : ""}`} onClick={() => setExpanded((x) => !x)}>
           {l.description}
@@ -280,7 +277,7 @@ function HitCard({
         )}
         {l.posting_id ? (
           <button type="button" className="btn" onClick={() => onOpen(l.posting_id!)}>
-            ✓ Gemerkt · öffnen
+            Gemerkt, öffnen
           </button>
         ) : (
           <button type="button" className="btn btn--primary" onClick={() => save.mutate()} disabled={save.isPending}>

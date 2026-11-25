@@ -58,8 +58,15 @@ def _location(item: dict[str, Any]) -> str | None:
         place = lokationen[0].get("adresse") or lokationen[0]
     elif isinstance(item.get("arbeitsort"), dict):  # v4
         place = item["arbeitsort"]
-    parts = [p for p in (place.get("ort"), place.get("region")) if isinstance(p, str) and p]
-    return ", ".join(parts) or None
+    ort, region = (
+        v.strip() if isinstance(v, str) and v.strip() else None
+        for v in (place.get("ort"), place.get("region"))
+    )
+    if region and region.isupper():
+        region = region.title()  # v6 liefert Bundesländer in Großbuchstaben
+    if ort and region and ort.casefold() == region.casefold():
+        region = None  # Stadtstaaten: "Hamburg, Hamburg" -> "Hamburg"
+    return ", ".join(p for p in (ort, region) if p) or None
 
 
 def to_draft(item: dict[str, Any]) -> ListingDraft | None:

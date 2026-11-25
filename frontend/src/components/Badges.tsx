@@ -37,3 +37,16 @@ export function Priority({ value, onChange }: { value: number; onChange?: (v: nu
     </span>
   );
 }
+
+/** Metadaten als einzelne Elemente; Trenner kommen aus dem CSS. */
+export function MetaLine({ items, className = "card__meta" }: { items: (string | null | undefined)[]; className?: string }) {
+  const shown = items.filter((m): m is string => Boolean(m));
+  if (shown.length === 0) return null;
+  return (
+    <p className={className}>
+      {shown.map((m) => (
+        <span key={m}>{m}</span>
+      ))}
+    </p>
+  );
+}
