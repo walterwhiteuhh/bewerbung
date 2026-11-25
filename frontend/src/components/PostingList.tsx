@@ -2,6 +2,7 @@ import type { PostingListItem } from "../api/types";
 import { formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
+import { TagList } from "./TagInput";
 
 interface Props {
   items: PostingListItem[];
@@ -10,9 +11,10 @@ interface Props {
   loading: boolean;
   onCreate: () => void;
   filtered: boolean;
+  activeTags?: string[];
 }
 
-export function PostingList({ items, selectedId, onSelect, loading, onCreate, filtered }: Props) {
+export function PostingList({ items, selectedId, onSelect, loading, onCreate, filtered, activeTags = [] }: Props) {
   if (loading && items.length === 0) {
     return (
       <ul className="list" aria-busy>
@@ -55,6 +57,7 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
               <h3 className="card__title">{p.title}</h3>
               <p className="card__company">{p.company?.name ?? "Firma unbekannt"}</p>
               <MetaLine items={[p.location, p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]} />
+              <TagList tags={p.tags} active={activeTags} />
               <div className="card__bottom">
                 <span className="muted">{relativeTime(p.updated_at)}</span>
                 {p.application && <Priority value={p.application.priority} />}

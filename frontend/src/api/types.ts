@@ -90,6 +90,7 @@ export interface PostingListItem {
   created_at: string;
   updated_at: string;
   application: ApplicationSummary | null;
+  tags: string[];
 }
 
 export interface PostingDetail extends Omit<PostingListItem, "application"> {
@@ -124,6 +125,12 @@ export interface PostingInput {
   raw_payload?: Record<string, unknown> | null;
   initial_status?: ApplicationStatus;
   priority?: number;
+  tags?: string[];
+}
+
+export interface TagCount {
+  name: string;
+  count: number;
 }
 
 export interface SourceDetection {
@@ -168,6 +175,7 @@ export interface PostingFilter {
   status: ApplicationStatus[];
   source: JobSource[];
   remote: RemoteType[];
+  tag: string[];
   location: string;
   minSalary: number | null;
   followUpDue: boolean;

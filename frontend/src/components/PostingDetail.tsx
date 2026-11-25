@@ -6,6 +6,7 @@ import type { Application, ApplicationStatus, PostingDetail as Posting } from ".
 import { formatDate, formatDateTime, formatSalary, isoToLocalDate, localDateToIso } from "../lib/format";
 import { EXITS, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
+import { TagInput } from "./TagInput";
 import { useToast } from "./Toast";
 
 interface Props {
@@ -66,6 +67,8 @@ export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
         {p.external_id && <Fact label="Job-ID" value={p.external_id} />}
       </section>
 
+      <TagsSection posting={p} />
+
       {app && <ApplicationFields key={app.id} app={app} />}
 
       {p.description && (
@@ -92,6 +95,22 @@ export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
         </button>
       </footer>
     </article>
+  );
+}
+
+/** Hashtags direkt in der Detailansicht pflegen; jede Änderung wird sofort gespeichert. */
+function TagsSection({ posting }: { posting: Posting }) {
+  const toast = useToast();
+  const save = useMutate((tags: string[]) => api.updatePosting(posting.id, { tags }));
+  return (
+    <section className="section">
+      <h3>Hashtags</h3>
+      <TagInput
+        value={posting.tags}
+        onChange={(tags) => save.mutate(tags, { onError: (e) => toast(e.message, "error") })}
+      />
+      <p className="hint">Tipp: #hashtags in Notizen werden automatisch übernommen.</p>
+    </section>
   );
 }
 

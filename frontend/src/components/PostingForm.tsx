@@ -14,6 +14,7 @@ import {
 } from "../api/types";
 import { REMOTE_LABEL, SOURCE_LABEL, STATUS_LABEL } from "../lib/labels";
 import { Priority } from "./Badges";
+import { TagInput } from "./TagInput";
 import { useToast } from "./Toast";
 
 interface Props {
@@ -39,6 +40,7 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
     description: initial?.description ?? "",
     initial_status: "saved" as ApplicationStatus,
     priority: 3,
+    tags: initial?.tags ?? ([] as string[]),
   });
   const [detection, setDetection] = useState<SourceDetection | null>(null);
   const [imported, setImported] = useState<ImportPreview | null>(null);
@@ -98,6 +100,7 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
       salary_min: toInt(f.salary_min),
       salary_max: toInt(f.salary_max),
       description: f.description || null,
+      tags: f.tags,
       ...(imported && !editing
         ? {
             raw_payload: imported.raw_payload,
@@ -230,6 +233,11 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
           </div>
         </>
       )}
+
+      <div className="field field--full">
+        <span>Hashtags</span>
+        <TagInput value={f.tags} onChange={(v) => set("tags", v)} placeholder="z. B. #python #hamburg #traumjob" />
+      </div>
 
       <label className="field field--full">
         <span>Beschreibung</span>

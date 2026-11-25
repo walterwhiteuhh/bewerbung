@@ -61,6 +61,7 @@ frontend/      React + TypeScript + Vite, TanStack Query, mobile-first CSS
 | `job_postings` | Stellenanzeige mit `source`, `external_id`, `url_normalized`, `raw_payload` (Rohdaten künftiger Importer) |
 | `applications` | Bewerbung zu einer Stelle; `current_status` ist eine denormalisierte Projektion für schnelle Filter |
 | `application_status_events` | **Append-only** Status-Historie, bitemporal: `occurred_at` (fachlich, rückdatierbar) und `recorded_at` (Erfassung) |
+| `tags` / `posting_tags` | Hashtags. `tags.key` ist der normalisierte Name ("Python" = "python"); Zuordnungen werden beim Entfernen mit `removed_at` beendet statt gelöscht, `origin` sagt, ob sie von Hand oder aus einer Notiz (`#tag`) kamen |
 | `notes` | Notizen pro Bewerbung |
 | `listings` | Anzeige je Portal (Rohsicht); `posting_id` NULL = Suchtreffer, sonst verknüpfte Stelle |
 | `search_profiles` | Gespeicherte Suchen |
@@ -120,6 +121,7 @@ default_registry().register(XingAdapter())
 | POST | `/api/applications/{id}/status` | Statuswechsel als Event (optional Notiz, Datum) |
 | PATCH | `/api/applications/{id}` | Priorität, Kontakt, Nachfass-Datum |
 | POST | `/api/applications/{id}/notes` | Notiz hinzufügen |
+| GET | `/api/tags` | Alle Hashtags mit Anzahl der Stellen; Filter in `/api/postings?tag=python&tag=remote` (UND) |
 | GET | `/api/stats` | Zähler je Status/Quelle, Rücklaufquote |
 | GET | `/api/search/providers` | Verfügbare Such-Quellen |
 | POST | `/api/search` | Live-Suche über Portale |

@@ -5,10 +5,18 @@ from __future__ import annotations
 import logging
 from typing import Any, TypeVar
 
-from sqlalchemy import ColumnElement, Select, SQLColumnExpression, and_, func, or_, select
+from sqlalchemy import ColumnElement, Select, SQLColumnExpression, and_, exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from bewerbung.db.models import Application, ApplicationStatusEvent, Company, JobPosting, Listing
+from bewerbung.db.models import (
+    Application,
+    ApplicationStatusEvent,
+    Company,
+    JobPosting,
+    Listing,
+    PostingTag,
+    Tag,
+)
 from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus, JobSource
 from bewerbung.domain.errors import DuplicatePostingError, NotFoundError
@@ -18,7 +26,9 @@ from bewerbung.domain.schemas import (
     PostingUpdate,
     SourceDetection,
 )
+from bewerbung.domain.tags import tag_key
 from bewerbung.services.companies import get_or_create_company
+from bewerbung.services.tags import add_tags, set_tags
 from bewerbung.sources import SourceReference, SourceRegistry
 
 logger = logging.getLogger(__name__)
@@ -118,6 +128,8 @@ def create_posting(
         )
     session.add(posting)
     session.flush()
+    if data.tags:
+        add_tags(session, posting, data.tags)
     logger.info("Stelle %s angelegt (Quelle %s)", posting.id, source)
     return posting
 
@@ -129,6 +141,7 @@ def get_posting(session: Session, posting_id: int) -> JobPosting:
         .options(
             selectinload(JobPosting.applications).selectinload(Application.events),
             selectinload(JobPosting.applications).selectinload(Application.notes),
+            selectinload(JobPosting.tag_links),
         )
     )
     if posting is None:
@@ -141,6 +154,12 @@ def update_posting(
 ) -> JobPosting:
     posting = get_posting(session, posting_id)
     changes = data.model_dump(exclude_unset=True)
+
+    if "tags" in changes:
+        tags = changes.pop("tags")
+        if tags is not None:
+            set_tags(session, posting, tags)
+            posting.updated_at = utcnow()
 
     if "company_name" in changes:
         name = changes.pop("company_name")
@@ -203,6 +222,14 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
         where.append(JobPosting.source.in_(flt.source))
     if flt.remote:
         where.append(JobPosting.remote_type.in_(flt.remote))
+    for key in {tag_key(t) for t in flt.tag}:
+        where.append(
+            exists().where(
+                PostingTag.posting_id == JobPosting.id,
+                PostingTag.removed_at.is_(None),
+                PostingTag.tag_id == select(Tag.id).where(Tag.key == key).scalar_subquery(),
+            )
+        )
     if flt.location:
         where.append(func.lower(JobPosting.location).like(f"%{flt.location.lower()}%"))
     if flt.min_salary is not None:
@@ -235,7 +262,7 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
     ordering = sort_col.desc() if flt.order == "desc" else sort_col.asc()
 
     rows = session.scalars(
-        base.options(selectinload(JobPosting.applications))
+        base.options(selectinload(JobPosting.applications), selectinload(JobPosting.tag_links))
         .order_by(ordering, JobPosting.id.desc())
         .limit(flt.limit)
         .offset(flt.offset)

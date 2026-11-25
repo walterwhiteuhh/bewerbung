@@ -13,6 +13,8 @@ from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus
 from bewerbung.domain.errors import InvalidTransitionError, NotFoundError
 from bewerbung.domain.schemas import ApplicationUpdate, NoteCreate, StatusChange
+from bewerbung.domain.tags import extract_hashtags
+from bewerbung.services.tags import add_tags
 
 logger = logging.getLogger(__name__)
 
@@ -84,5 +86,8 @@ def add_note(session: Session, application_id: int, data: NoteCreate) -> Note:
     # Notiz zählt als Aktivität: Bewerbung in "zuletzt geändert" nach oben holen.
     application.updated_at = utcnow()
     application.posting.updated_at = application.updated_at
+    # "#remote" o. ä. in der Notiz ordnet die Stelle zusätzlich diesem Hashtag zu.
+    if hashtags := extract_hashtags(data.body):
+        add_tags(session, application.posting, hashtags, origin="note")
     session.flush()
     return note
