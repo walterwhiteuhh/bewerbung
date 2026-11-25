@@ -12,6 +12,20 @@ export const STATUSES = [
 ] as const;
 export type ApplicationStatus = (typeof STATUSES)[number];
 
+/** Grund eines Endzustands; spiegelt OutcomeReason im Backend. */
+export const OUTCOME_REASONS = [
+  "no_response",
+  "rejected_screening",
+  "rejected_interview",
+  "position_filled",
+  "salary_mismatch",
+  "location_mismatch",
+  "better_offer",
+  "own_decision",
+  "other",
+] as const;
+export type OutcomeReason = (typeof OUTCOME_REASONS)[number];
+
 export const SOURCES = [
   "linkedin",
   "stepstone",
@@ -108,8 +122,18 @@ export interface StatusEvent {
   from_status: ApplicationStatus | null;
   to_status: ApplicationStatus;
   note: string | null;
+  reason_code: OutcomeReason | null;
+  offered_salary: number | null;
+  offered_currency: string | null;
   occurred_at: string;
   recorded_at: string;
+}
+
+/** Zusatzangaben beim Statuswechsel (Label für spätere Auswertung). */
+export interface StatusOutcome {
+  reasonCode?: OutcomeReason;
+  offeredSalary?: number;
+  offeredCurrency?: string;
 }
 
 export interface Note {
@@ -188,7 +212,7 @@ export interface TagCount {
   derived?: boolean;
 }
 
-export type EntityType = "company" | "document" | "search_profile";
+export type EntityType = "posting" | "company" | "document" | "search_profile";
 
 export interface LinkedItem {
   id: number;

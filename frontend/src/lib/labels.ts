@@ -1,4 +1,4 @@
-import type { ApplicationStatus, JobSource, DocumentKind, OfferType, RemoteType, WorkTime } from "../api/types";
+import type { ApplicationStatus, JobSource, DocumentKind, OfferType, OutcomeReason, RemoteType, WorkTime } from "../api/types";
 
 export const STATUS_LABEL: Record<ApplicationStatus, string> = {
   saved: "Gemerkt",
@@ -63,4 +63,16 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   zertifikat: "Zertifikat",
   anschreiben: "Anschreiben",
   sonstiges: "Sonstiges",
+};
+
+export const OUTCOME_REASON_LABEL: Record<OutcomeReason, string> = {
+  no_response: "Nie Rückmeldung",
+  rejected_screening: "Absage nach Unterlagen",
+  rejected_interview: "Absage nach Gespräch",
+  position_filled: "Stelle besetzt",
+  salary_mismatch: "Gehalt passt nicht",
+  location_mismatch: "Ort passt nicht",
+  better_offer: "Besseres Angebot",
+  own_decision: "Eigene Entscheidung",
+  other: "Sonstiges",
 };

@@ -5,9 +5,10 @@ import { InsightsSection } from "./Insights";
 
 import { api } from "../api/client";
 import { useLetters, useMutate, usePosting } from "../api/hooks";
-import type { Application, ApplicationStatus, PostingDetail as Posting } from "../api/types";
+import type { Application, ApplicationStatus, OutcomeReason, PostingDetail as Posting } from "../api/types";
 import { formatDate, formatDateTime, formatSalary, isoToLocalDate, localDateToIso } from "../lib/format";
-import { EXITS, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
+import { EXITS, OUTCOME_REASON_LABEL, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
+import { asksSalary, parseSalary, reasonsFor } from "../lib/outcome";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 import { Dialog } from "./Dialog";
 import { PostingDocuments } from "./Documents";
@@ -175,9 +176,19 @@ function StatusControl({ app }: { app: Application }) {
   const [target, setTarget] = useState<ApplicationStatus | null>(null);
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
+  const [reason, setReason] = useState<OutcomeReason | "">("");
+  const [salary, setSalary] = useState("");
   const change = useMutate(() =>
-    api.changeStatus(app.id, target!, note, date ? (localDateToIso(date) ?? undefined) : undefined),
+    api.changeStatus(app.id, target!, note, date ? (localDateToIso(date) ?? undefined) : undefined, {
+      reasonCode: reason || undefined,
+      offeredSalary: asksSalary(target!) ? parseSalary(salary) : undefined,
+    }),
   );
+  const pick = (s: ApplicationStatus | null) => {
+    setTarget(s);
+    setReason("");
+    setSalary("");
+  };
   const currentRank = PIPELINE.indexOf(app.current_status);
 
   function submit(e: FormEvent) {
@@ -185,7 +196,7 @@ function StatusControl({ app }: { app: Application }) {
     change.mutate(undefined, {
       onSuccess: () => {
         toast(`Status: ${STATUS_LABEL[target!]}`);
-        setTarget(null);
+        pick(null);
         setNote("");
         setDate("");
       },
@@ -202,7 +213,7 @@ function StatusControl({ app }: { app: Application }) {
             <button
               type="button"
               disabled={s === app.current_status}
-              onClick={() => setTarget(s)}
+              onClick={() => pick(s)}
               aria-pressed={target === s}
             >
               <span className="stepper__dot" aria-hidden />
@@ -218,7 +229,7 @@ function StatusControl({ app }: { app: Application }) {
             type="button"
             className={`chip status-${s} ${app.current_status === s ? "is-active" : ""}`}
             disabled={s === app.current_status}
-            onClick={() => setTarget(s)}
+            onClick={() => pick(s)}
           >
             <span className="dot" aria-hidden />
             {STATUS_LABEL[s]}
@@ -231,13 +242,38 @@ function StatusControl({ app }: { app: Application }) {
           <p>
             Wechsel zu <strong>{STATUS_LABEL[target]}</strong>
           </p>
+          {reasonsFor(target).length > 0 && (
+            <label className="inline">
+              <span>Grund</span>
+              <select value={reason} onChange={(e) => setReason(e.target.value as OutcomeReason | "")}>
+                <option value="">Keine Angabe</option>
+                {reasonsFor(target).map((r) => (
+                  <option key={r} value={r}>
+                    {OUTCOME_REASON_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {asksSalary(target) && (
+            <label className="inline">
+              <span>Gehalt (brutto/Jahr, €)</span>
+              <input
+                inputMode="numeric"
+                placeholder="z. B. 65.000"
+                value={salary}
+                onChange={(e) => setSalary(e.target.value)}
+                aria-invalid={salary !== "" && parseSalary(salary) === undefined}
+              />
+            </label>
+          )}
           <input placeholder="Notiz (optional), z. B. Telefonat mit HR" value={note} onChange={(e) => setNote(e.target.value)} />
           <label className="inline">
             <span>Datum</span>
             <input type="date" value={date} max={isoToLocalDate(new Date().toISOString())} onChange={(e) => setDate(e.target.value)} />
           </label>
           <div className="row">
-            <button type="button" className="btn btn--ghost" onClick={() => setTarget(null)}>
+            <button type="button" className="btn btn--ghost" onClick={() => pick(null)}>
               Abbrechen
             </button>
             <button type="submit" className="btn btn--primary" disabled={change.isPending}>
@@ -292,7 +328,7 @@ function ApplicationFields({ app }: { app: Application }) {
 }
 
 type Entry =
-  | { kind: "event"; at: string; key: string; text: string; note: string | null; status: ApplicationStatus }
+  | { kind: "event"; at: string; key: string; text: string; note: string | null; detail: string | null; status: ApplicationStatus }
   | { kind: "note"; at: string; key: string; text: string };
 
 /** Statuswechsel und Notizen als eine gemeinsame, neueste-zuerst Zeitleiste. */
@@ -308,6 +344,12 @@ function Activity({ app }: { app: Application }) {
       key: `e${e.id}`,
       text: e.from_status ? `${STATUS_LABEL[e.from_status]} → ${STATUS_LABEL[e.to_status]}` : `Angelegt als ${STATUS_LABEL[e.to_status]}`,
       note: e.note,
+      detail: [
+        e.reason_code ? OUTCOME_REASON_LABEL[e.reason_code] : null,
+        e.offered_salary !== null ? formatSalary(e.offered_salary, e.offered_salary, e.offered_currency ?? "EUR") : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || null,
       status: e.to_status,
     })),
     ...app.notes.map((n) => ({ kind: "note" as const, at: n.created_at, key: `n${n.id}`, text: n.body })),
@@ -334,6 +376,7 @@ function Activity({ app }: { app: Application }) {
             <span className="timeline__dot" aria-hidden />
             <div>
               <p className={e.kind === "note" ? "prose" : "timeline__event"}>{e.text}</p>
+              {e.kind === "event" && e.detail && <p className="timeline__detail">{e.detail}</p>}
               {e.kind === "event" && e.note && <p className="prose muted">{e.note}</p>}
               <time dateTime={e.at} className="muted">
                 {formatDateTime(e.at)}
