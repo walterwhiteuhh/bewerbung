@@ -1,6 +1,8 @@
 import { useId, useState, type KeyboardEvent } from "react";
 
-import { useTags } from "../api/hooks";
+import { useTagOverview, useTags } from "../api/hooks";
+import type { TagCount } from "../api/types";
+import { TagOverviewDialog } from "./TagOverview";
 import { addUnique, cleanTag, sameTag } from "../lib/tags";
 
 interface Props {
@@ -111,23 +113,50 @@ export function TagBar({
   selected,
   onToggle,
 }: {
-  tags: { name: string; count: number }[] | undefined;
+  tags: (Pick<TagCount, "name" | "count"> & { derived?: boolean })[] | undefined;
   selected: string[];
   onToggle: (tag: string) => void;
 }) {
   const data = tags;
+  const [overviewTag, setOverviewTag] = useState<string | null>(null);
+  const last = selected.length ? selected[selected.length - 1]! : null;
+  const { data: overview } = useTagOverview(last);
   if (!data || data.length === 0) return null;
+  const related = (overview?.related ?? []).filter((r) => !selected.some((s) => sameTag(s, r)));
   return (
-    <div className="tag-bar" role="toolbar" aria-label="Nach Hashtag filtern">
-      {data.map((t) => {
-        const on = selected.some((s) => sameTag(s, t.name));
-        return (
-          <button key={t.name} type="button" className={`hashtag hashtag--button ${on ? "is-active" : ""}`} aria-pressed={on} onClick={() => onToggle(t.name)}>
-            #{t.name}
-            <span className="hashtag__count">{t.count}</span>
+    <>
+      <div className="tag-bar" role="toolbar" aria-label="Nach Hashtag filtern">
+        {data.map((t) => {
+          const on = selected.some((s) => sameTag(s, t.name));
+          return (
+            <button
+              key={t.name}
+              type="button"
+              className={`hashtag hashtag--button ${on ? "is-active" : ""} ${t.derived ? "is-derived" : ""}`}
+              aria-pressed={on}
+              title={t.derived ? "Oberbegriff: schließt verwandte Hashtags ein" : undefined}
+              onClick={() => onToggle(t.name)}
+            >
+              #{t.name}
+              <span className="hashtag__count">{t.count}</span>
+            </button>
+          );
+        })}
+      </div>
+      {last && overview && (
+        <p className="tag-related">
+          <button type="button" className="btn btn--small btn--ghost" onClick={() => setOverviewTag(last)}>
+            Alles zu #{overview.tag}
           </button>
-        );
-      })}
-    </div>
+          {related.length > 0 && <span className="muted">Verwandt:</span>}
+          {related.slice(0, 6).map((r) => (
+            <button key={r} type="button" className="hashtag hashtag--link" onClick={() => onToggle(r)}>
+              #{r}
+            </button>
+          ))}
+        </p>
+      )}
+      <TagOverviewDialog tag={overviewTag} onClose={() => setOverviewTag(null)} onPickTag={(t) => { setOverviewTag(null); onToggle(t); }} />
+    </>
   );
 }

@@ -15,7 +15,6 @@ from bewerbung.db.models import (
     JobPosting,
     Listing,
     PostingTag,
-    Tag,
 )
 from bewerbung.db.types import utcnow
 from bewerbung.domain.enums import ApplicationStatus, JobSource
@@ -30,6 +29,7 @@ from bewerbung.domain.schemas import (
 from bewerbung.domain.tags import tag_key
 from bewerbung.services import companies
 from bewerbung.services.companies import get_or_create_company
+from bewerbung.services.tag_graph import expand_filter_ids
 from bewerbung.services.tags import add_tags, set_tags
 from bewerbung.sources import SourceReference, SourceRegistry
 
@@ -237,12 +237,15 @@ def list_postings(session: Session, flt: PostingFilter) -> tuple[list[JobPosting
         where.append(JobPosting.source.in_(flt.source))
     if flt.remote:
         where.append(JobPosting.remote_type.in_(flt.remote))
-    for key in {tag_key(t) for t in flt.tag}:
+    # Verknüpfungen im Hintergrund: "#ki" findet auch Stellen mit #machine-learning (Unterbegriffe
+    # und Synonyme). Jeder gewählte Hashtag muss passen (UND), eine Stelle genügt je Hashtag.
+    keys = sorted({tag_key(t) for t in flt.tag})
+    for ids in expand_filter_ids(session, keys) if keys else []:
         where.append(
             exists().where(
                 PostingTag.posting_id == JobPosting.id,
                 PostingTag.removed_at.is_(None),
-                PostingTag.tag_id == select(Tag.id).where(Tag.key == key).scalar_subquery(),
+                PostingTag.tag_id.in_(ids or {-1}),
             )
         )
     if flt.location:

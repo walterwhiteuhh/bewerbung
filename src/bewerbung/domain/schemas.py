@@ -323,6 +323,45 @@ class PostingFilter(_Schema):
 class TagCount(_Schema):
     name: str
     count: int
+    derived: bool = Field(
+        default=False,
+        description="Oberbegriff aus den Verknüpfungen, an keiner Stelle direkt gesetzt",
+    )
+
+
+class TagRelationRead(_Schema):
+    id: int
+    tag: str
+    related: str
+    kind: Literal["implies", "alias", "related"]
+    origin: str
+
+
+class TagRelationCreate(_Schema):
+    tag: str = Field(min_length=1, max_length=41, description="Unterbegriff bzw. erster Begriff")
+    related: str = Field(
+        min_length=1, max_length=41, description="Oberbegriff bzw. zweiter Begriff"
+    )
+    kind: Literal["implies", "alias", "related"]
+
+
+class EntityTagsUpdate(_Schema):
+    tags: TagList = Field(default_factory=list)
+
+
+class LinkedItem(_Schema):
+    id: int
+    label: str
+
+
+class TagOverview(_Schema):
+    tag: str
+    includes: list[str]
+    related: list[str]
+    postings: list[LinkedItem]
+    company: list[LinkedItem]
+    document: list[LinkedItem]
+    search_profile: list[LinkedItem]
 
 
 class CountBucket(_Schema):

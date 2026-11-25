@@ -2,6 +2,7 @@ import { api } from "../api/client";
 import { useMutate } from "../api/hooks";
 import type { Company, CompanyUpdate } from "../api/types";
 import { CompanyLogo } from "./CompanyLogo";
+import { EntityTags } from "./EntityTags";
 import { SocialLinks } from "./SocialLinks";
 import { RatingEditor } from "./EmployerRating";
 import { useToast } from "./Toast";
@@ -79,6 +80,10 @@ export function CompanySection({ company }: { company: Company }) {
         </div>
       </div>
       <SocialLinks links={company.social_links} />
+      <div className="company__tags">
+        <span className="muted">Hashtags der Firma</span>
+        <EntityTags type="company" id={company.id} placeholder="#wunscharbeitgeber hinzufügen" />
+      </div>
       <div className="facts facts--edit">
         <label className="fact">
           <span>Website</span>

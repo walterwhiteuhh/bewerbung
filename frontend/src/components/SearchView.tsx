@@ -6,7 +6,7 @@ import { PlaceHover } from "./PlaceCard";
 import { RunHistory } from "./RunHistory";
 import { TagBar, TagList } from "./TagInput";
 import { filterByTags, portalQuery, tagCounts } from "../lib/hitTags";
-import { addUnique, sameTag } from "../lib/tags";
+import { addUnique, sameTag, splitHashtags } from "../lib/tags";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
@@ -71,9 +71,16 @@ export function SearchView({ onOpenPosting }: Props) {
   });
 
   const saveProfile = useMutation({
-    mutationFn: () =>
-      editing ? api.updateProfile(editing.id, profilePayload(editing.name)) : api.createProfile(profilePayload("")),
+    mutationFn: async () => {
+      const saved = await (editing ? api.updateProfile(editing.id, profilePayload(editing.name)) : api.createProfile(profilePayload("")));
+      // #hashtags im Suchfeld werden zu Hashtags der gespeicherten Suche (übergreifend filterbar).
+      const tags = splitHashtags(form.query).tags;
+      if (tags.length > 0) await api.setEntityTags("search_profile", saved.id, tags);
+      return saved;
+    },
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tag-links", "search_profile"] });
+      void qc.invalidateQueries({ queryKey: ["tags"] });
       toast(editing ? "Gespeicherte Suche aktualisiert" : "Suche gespeichert");
       setEditing(null);
       void qc.invalidateQueries({ queryKey: ["profiles"] });

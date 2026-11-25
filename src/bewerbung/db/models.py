@@ -218,6 +218,70 @@ class Tag(TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
 
 
+class TagLink(Base):
+    """Hashtag an Firma, Unterlage oder gespeicherter Suche (``entity_type``/``entity_id``).
+
+    Allgemeiner als ``posting_tags``: derselbe Hashtag gilt übergreifend für alle Objekte.
+    Ohne Fremdschlüssel auf das Objekt, dafür bereinigt der Service beim Löschen.
+    Wie bei Stellen mit Zeitraum (added_at .. removed_at), damit die Historie erhalten bleibt.
+    """
+
+    __tablename__ = "tag_links"
+    __table_args__ = (
+        Index(
+            "uq_tag_links_active",
+            "entity_type",
+            "entity_id",
+            "tag_id",
+            unique=True,
+            sqlite_where=text("removed_at IS NULL"),
+            postgresql_where=text("removed_at IS NULL"),
+        ),
+        Index("ix_tag_links_tag_removed", "tag_id", "removed_at"),
+        Index("ix_tag_links_entity", "entity_type", "entity_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), nullable=False)
+    origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
+    added_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    tag: Mapped[Tag] = relationship(lazy="joined")
+
+
+class TagRelation(Base):
+    """Verknüpfung zwischen Hashtags: ``implies`` (Unterbegriff -> Oberbegriff), ``alias``
+    (gleichbedeutend) oder ``related`` (Hinweis). Entfernte Zeilen bleiben (``removed_at``),
+    damit eine bewusst gelöschte Startverknüpfung nicht wiederkommt."""
+
+    __tablename__ = "tag_relations"
+    __table_args__ = (
+        Index(
+            "uq_tag_relations_active",
+            "tag_key",
+            "related_key",
+            "kind",
+            unique=True,
+            sqlite_where=text("removed_at IS NULL"),
+            postgresql_where=text("removed_at IS NULL"),
+        ),
+        Index("ix_tag_relations_related", "related_key", "kind"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Über den normalisierten Schlüssel statt Tag-ID: Oberbegriffe wie "frontend" müssen
+    # nicht an einer Stelle hängen, um zu existieren, und keine Tag-Zeile belegen.
+    tag_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    related_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    origin: Mapped[str] = mapped_column(String(16), default="manual", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
 class PostingTag(Base):
     """Zuordnung Stelle <-> Hashtag mit Gültigkeitszeitraum (added_at .. removed_at)."""
 

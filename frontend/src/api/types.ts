@@ -184,6 +184,26 @@ export interface PostingInput {
 export interface TagCount {
   name: string;
   count: number;
+  /** Oberbegriff aus den Verknüpfungen, an keiner Stelle direkt gesetzt. */
+  derived?: boolean;
+}
+
+export type EntityType = "company" | "document" | "search_profile";
+
+export interface LinkedItem {
+  id: number;
+  label: string;
+}
+
+/** Ein Hashtag über alle Objekte (Stellen, Firmen, Unterlagen, gespeicherte Suchen). */
+export interface TagOverview {
+  tag: string;
+  includes: string[];
+  related: string[];
+  postings: LinkedItem[];
+  company: LinkedItem[];
+  document: LinkedItem[];
+  search_profile: LinkedItem[];
 }
 
 export interface SourceDetection {
