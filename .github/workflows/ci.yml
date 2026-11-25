@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Ruff
+        run: uv run ruff check . && uv run ruff format --check src tests
+      - name: Mypy
+        run: uv run mypy src
+      - name: Pytest
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: npm ci
+      - name: Typecheck und Build
+        run: npm run build
+      - name: Unit-Tests (Vitest)
+        run: npm test
+      - name: Backend für die Layouttests
+        working-directory: .
+        run: uv sync --frozen
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+      - name: Layouttests 320 px bis 4K (Playwright)
+        run: npx playwright test --trace off
+      - name: Bericht bei Fehlern
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          retention-days: 7

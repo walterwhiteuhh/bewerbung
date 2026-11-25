@@ -39,7 +39,31 @@ uv run pytest
 uv run ruff check src tests
 uv run mypy src
 cd frontend && npm run typecheck
+cd frontend && npm test                  # Vitest: Formatierung, Sortierung, Kartenmathematik, Komponenten
+cd frontend && npm run build && npm run test:e2e   # Playwright: Layout von 320 px bis 4K
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) führt alles bei jedem Pull Request aus.
+
+### Responsivität
+
+Ein Layout für alle Geräte, mobil zuerst. Die Playwright-Tests (`frontend/e2e/responsive.spec.ts`)
+öffnen Liste, Detail, Suche, Info-Karte und Dialoge in zehn Breiten von 320 px (iPhone SE) bis
+3840 px (4K) und schlagen fehl, sobald
+
+- die Seite seitlich scrollt oder ein Element aus dem Bild ragt,
+- auf Touch-Geräten ein Bedienelement kleiner als 32 px ist,
+- die Info-Karte oder ein Dialog den Bildschirm verlässt (unter 640 px wird die Karte zum Bottom-Sheet),
+- auf großen Bildschirmen Schrift und Inhaltsbreite nicht mitwachsen (17/20/24 px ab 1800/2400/3200 px).
+
+Der Testserver `tests/e2e/server.py` startet die App mit Temp-Datenbank und Fake-Portalen, enthält
+bewusst überlange Titel und Firmennamen und braucht kein Netzwerk. Lange Wörter brechen über
+`overflow-wrap: anywhere`, Grid-Spalten verwenden `minmax(0, 1fr)`, damit ein einzelner
+`nowrap`-Text nicht die ganze Spalte aufbläht.
+
+Leere Ansichten zeigen ein kleines SVG-Segelschiff auf bewegter See (`ShipScene.tsx`): reine
+CSS-Transforms, keine Bilder, kein JavaScript pro Frame, unter 2 KB. Bei „Bewegung reduzieren“
+im System steht es still.
 
 ## Architektur
 

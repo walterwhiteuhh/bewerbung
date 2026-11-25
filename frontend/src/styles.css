@@ -32,6 +32,7 @@
   --radius-sm: 10px;
   --gutter: 16px;
   --topbar-h: 0px;
+  --content-max: 90rem;
 
   --s-saved: #8b93a7;
   --s-applied: #3a7bd5;
@@ -228,14 +229,33 @@ a.btn { color: var(--text); }
 .priority > :nth-child(4) { height: 12px; }
 .priority > :nth-child(5) { height: 14px; }
 .priority .on { background: var(--accent); }
-/* Editierbar: größere Trefferfläche */
-.priority:has(button) { height: 24px; gap: 4px; }
-.priority button { width: 10px; }
-.priority button:nth-child(1) { height: 10px; }
-.priority button:nth-child(2) { height: 13px; }
-.priority button:nth-child(3) { height: 16px; }
-.priority button:nth-child(4) { height: 20px; }
-.priority button:nth-child(5) { height: 24px; }
+/* Editierbar: unsichtbare, volle Trefferfläche je Balken (Balken selbst als ::before) */
+.priority:has(button) { height: auto; gap: 0; align-items: stretch; }
+.priority > button:nth-child(n),
+.priority > button.on {
+  position: relative;
+  width: 14px;
+  height: 30px;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+.priority button::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.priority button.on::before { background: var(--accent); }
+.priority button:hover::before { background: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.priority button:nth-child(1)::before { height: 10px; }
+.priority button:nth-child(2)::before { height: 13px; }
+.priority button:nth-child(3)::before { height: 16px; }
+.priority button:nth-child(4)::before { height: 20px; }
+.priority button:nth-child(5)::before { height: 24px; }
 
 input:not([type="radio"]):not([type="checkbox"]), select, textarea {
   width: 100%;
@@ -244,7 +264,7 @@ input:not([type="radio"]):not([type="checkbox"]), select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 16px; /* verhindert Auto-Zoom auf iOS */
+  font-size: max(16px, 1rem); /* min. 16px gegen iOS-Auto-Zoom, wächst auf 4K mit */
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 textarea { resize: vertical; min-height: 64px; }
@@ -256,7 +276,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   color: var(--on-band);
 }
 .topbar__inner, .band__inner, .app {
-  max-width: 1440px;
+  max-width: var(--content-max);
   margin: 0 auto;
   padding-left: var(--gutter);
   padding-right: var(--gutter);
@@ -474,7 +494,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .filters__count { flex-basis: 100%; text-align: right; }
 
 /* --- Liste --------------------------------------------------------------- */
-.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .card {
   display: grid;
   gap: 3px;
@@ -495,7 +515,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .card--skeleton { height: 118px; box-shadow: none; background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .card__top { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
-.card__title { font-size: 1.1rem; font-weight: 650; line-height: 1.25; }
+.card__title { font-size: 1.1rem; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
 .card__company { color: var(--muted); font-weight: 500; }
 /* Trennpunkte stehen vor jedem Eintrag; der am Zeilenanfang wird weggeschnitten. */
 .card__meta {
@@ -766,10 +786,10 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .filter-panel .field > span { font-size: 0.8rem; color: var(--muted); }
 
 .band--search .band__inner { padding-top: 10px; padding-bottom: 64px; }
-.search-view { display: grid; gap: 20px; }
+.search-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .search-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: -64px; /* ragt ins Band hinein */
   padding: 16px;
@@ -933,13 +953,13 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 
 /* --- Tablet -------------------------------------------------------------- */
 @media (min-width: 640px) {
-  :root { --gutter: 24px; --topbar-h: 80px; }
+  :root { --gutter: 24px; --topbar-h: 5rem; }
   .topbar { position: sticky; top: 0; z-index: 10; }
   .topbar__inner { grid-template-columns: auto auto 1fr auto auto; align-items: center; gap: 18px; padding-top: 14px; padding-bottom: 14px; }
   .topbar__inner--search { grid-template-columns: auto auto 1fr; }
   .topbar .topbar__profile { position: static; justify-self: end; min-height: 40px; }
   .tabs { min-width: 300px; }
-  .brand__mark { width: 52px; height: 52px; }
+  .brand__mark { width: 3.25rem; height: 3.25rem; }
   .brand h1 { font-size: 2.05rem; }
   .brand__tag { font-size: 0.7rem; }
   .topbar__new { display: inline-flex; }
@@ -955,7 +975,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
   .kpi.kpi--lead span { font-size: 0.9rem; color: var(--on-band-muted); }
   .chips, .tag-bar { margin-left: 0; margin-right: 0; padding: 2px 0; flex-wrap: wrap; overflow: visible; }
 
-  .search-form { grid-template-columns: 2fr 1.4fr 0.8fr; align-items: end; padding: 20px; }
+  .search-form { grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 0.8fr); align-items: end; padding: 20px; }
   .search-form__what { grid-column: auto; }
   .list--results { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
   .card__actions .btn { flex: none; }
@@ -997,7 +1017,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 
   .layout {
     display: grid;
-    grid-template-columns: minmax(340px, 420px) 1fr;
+    grid-template-columns: minmax(21rem, 26rem) 1fr;
     gap: 24px;
     align-items: start;
   }
@@ -1422,3 +1442,87 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
   .ratings__list li { grid-template-columns: 5.5rem 4rem 1fr 1.2rem 1.5rem; }
   .ratings__list li > :nth-child(4) { display: none; }
 }
+
+
+/* --- Touch: Trefferflächen mindestens ~32-44 px -------------------------------- */
+@media (pointer: coarse) {
+  .priority > button:nth-child(n), .priority > button.on { width: 22px; height: 44px; }
+  .hashtag--removable button { width: 32px; height: 32px; margin: -6px -5px -6px -2px; }
+  .ratings__del { min-width: 36px; min-height: 36px; }
+  .link-btn { padding: 8px 0; }
+}
+
+/* --- Große Bildschirme (QHD, 4K): Inhalt und Schrift wachsen mit --------------- */
+@media (min-width: 1800px) {
+  :root { font-size: 17px; --content-max: 100rem; --gutter: 32px; }
+}
+@media (min-width: 2400px) {
+  :root { font-size: 20px; --content-max: 108rem; --gutter: 40px; }
+}
+@media (min-width: 3200px) {
+  :root { font-size: 24px; --content-max: 112rem; --gutter: 56px; }
+}
+
+/* --- Info-Karte auf schmalen Geräten als Bottom-Sheet ----------------------------- */
+.placecard__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.9);
+  color: #141c30;
+  font-size: 1.2rem;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+}
+.placecard.is-sheet {
+  left: 0 !important;
+  right: 0;
+  top: auto !important;
+  bottom: 0;
+  width: auto !important;
+  max-height: 85dvh;
+  overflow-y: auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation-name: placecard-sheet;
+}
+@keyframes placecard-sheet { from { transform: translateY(24px); opacity: 0; } }
+.placecard.is-sheet .minimap { height: 180px; }
+
+/* --- Segelschiff (leerer Zustand) ---------------------------------------------- */
+.ship { width: min(280px, 75%); height: auto; overflow: hidden; border-radius: 18px; }
+.ship--sm { width: min(180px, 55%); }
+.ship__sky { fill: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.ship__sun { fill: color-mix(in srgb, var(--marker) 75%, transparent); }
+.ship__gull path { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
+.ship__wave--back { fill: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+.ship__wave--mid { fill: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
+.ship__wave--front { fill: color-mix(in srgb, var(--accent) 70%, var(--band)); }
+/* --text ist hell im Dunkelmodus und dunkel im Hellmodus: Schiff bleibt immer sichtbar. */
+.ship__mast { stroke: var(--text); stroke-width: 3.5; stroke-linecap: round; }
+.ship__sail { fill: var(--surface); stroke: var(--text); stroke-width: 2.2; stroke-linejoin: round; }
+.ship__sail--front { fill: color-mix(in srgb, var(--marker) 30%, var(--surface)); }
+.ship__flag { fill: var(--marker); }
+.ship__hull { fill: var(--text); }
+.ship__stripe { stroke: var(--marker); stroke-width: 3; stroke-linecap: round; }
+.ship__boat, .ship__rock, .ship__wave, .ship__gull { transform-box: view-box; will-change: transform; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ship__wave--back { animation: ship-drift 9s linear infinite; }
+  .ship__wave--mid { animation: ship-drift 6s linear infinite reverse; }
+  .ship__wave--front { animation: ship-drift 4.5s linear infinite; }
+  .ship__boat { animation: ship-bob 3s ease-in-out infinite; }
+  .ship__rock { transform-origin: 120px 120px; animation: ship-rock 4s ease-in-out infinite; }
+  .ship__gull { animation: ship-gull 7s ease-in-out infinite; }
+}
+@keyframes ship-drift { from { transform: translateX(0); } to { transform: translateX(-240px); } }
+@keyframes ship-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
+@keyframes ship-rock { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(6deg); } }
+@keyframes ship-gull { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(14px, -5px); } }

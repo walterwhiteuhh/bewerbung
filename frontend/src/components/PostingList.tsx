@@ -4,6 +4,7 @@ import { formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL } from "../lib/labels";
 import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 import { TagList } from "./TagInput";
+import { ShipScene } from "./ShipScene";
 import { usePostingInsights } from "../api/hooks";
 import { PlaceHover } from "./PlaceCard";
 import { useState } from "react";
@@ -31,6 +32,7 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
   if (items.length === 0) {
     return (
       <div className="empty">
+        {!filtered && <ShipScene size="sm" />}
         <p className="empty__title">{filtered ? "Keine Treffer" : "Noch keine Stelle in Sicht"}</p>
         <p>{filtered ? "Passe Suche oder Filter an." : "Füge den Link einer Anzeige ein oder such in den Portalen, dann geht es los."}</p>
         {!filtered && (

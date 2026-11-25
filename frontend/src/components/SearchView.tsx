@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CompanyLogo } from "./CompanyLogo";
 import { FeatureChips } from "./Insights";
+import { sortHits, type HitSort } from "../lib/sortHits";
 import { PlaceHover } from "./PlaceCard";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import { OFFER_TYPES, WORK_TIMES, type JobFeatures, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchHit, type SearchRun, type WorkTime } from "../api/types";
+import { OFFER_TYPES, WORK_TIMES, type JobFeatures, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchRun, type WorkTime } from "../api/types";
 import { formatDate, formatSalary, relativeTime } from "../lib/format";
 import { OFFER_TYPE_LABEL, REMOTE_LABEL, SOURCE_LABEL, WORK_TIME_LABEL } from "../lib/labels";
 import { MetaLine, SourceTag } from "./Badges";
@@ -373,25 +374,8 @@ export function SearchView({ onOpenPosting }: Props) {
   );
 }
 
-type HitSort = "rank" | "match" | "distance" | "fresh";
 
 /** Sortierung nur in der Ansicht; fehlende Werte landen immer am Ende. */
-function sortHits(hits: SearchHit[], sort: HitSort): SearchHit[] {
-  if (sort === "rank") return hits;
-  const value = (h: SearchHit): number | null => {
-    const f = h.features;
-    if (!f) return null;
-    if (sort === "match") return f.match_score === null ? null : -f.match_score;
-    if (sort === "distance") return f.distance_km;
-    return f.age_days;
-  };
-  return [...hits].sort((a, b) => {
-    const va = value(a);
-    const vb = value(b);
-    if (va === null || vb === null) return va === null ? (vb === null ? a.rank - b.rank : 1) : -1;
-    return va - vb || a.rank - b.rank;
-  });
-}
 
 function HitCard({
   listing: l,
