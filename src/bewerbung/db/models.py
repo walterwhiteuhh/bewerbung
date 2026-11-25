@@ -154,6 +154,7 @@ class JobPosting(TimestampMixin, Base):
         ),
         Index("ix_job_postings_url_normalized", "url_normalized"),
         Index("ix_job_postings_source_created", "source", "created_at"),
+        Index("ix_job_postings_company_title", "company_id", "title_key"),
         CheckConstraint(
             "salary_min IS NULL OR salary_max IS NULL OR salary_min <= salary_max",
             name="salary_range",
@@ -174,6 +175,13 @@ class JobPosting(TimestampMixin, Base):
     salary_max: Mapped[int | None] = mapped_column(Integer)
     salary_currency: Mapped[str] = mapped_column(String(3), default="EUR", nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    # Abgeleitet wie bei ``Listing``, damit Analysen nicht über ``listings`` joinen müssen.
+    title_key: Mapped[str | None] = mapped_column(String(255))
+    city: Mapped[str | None] = mapped_column(String(120))
+    postal_code: Mapped[str | None] = mapped_column(String(10))
+    region: Mapped[str | None] = mapped_column(String(120))
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
 
     source: Mapped[JobSource] = mapped_column(_enum(JobSource, "job_source"), nullable=False)
     external_id: Mapped[str | None] = mapped_column(String(128))
@@ -239,6 +247,9 @@ class TagLink(Base):
         ),
         Index("ix_tag_links_tag_removed", "tag_id", "removed_at"),
         Index("ix_tag_links_entity", "entity_type", "entity_id"),
+        CheckConstraint(
+            "entity_type IN ('company', 'document', 'search_profile')", name="entity_type"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -333,6 +344,10 @@ class Application(TimestampMixin, Base):
     contact_name: Mapped[str | None] = mapped_column(String(255))
     contact_email: Mapped[str | None] = mapped_column(String(255))
     follow_up_at: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
+    # Profilstand beim Absenden: Feature-Snapshot "as of" für spätere Modelle.
+    profile_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("applicant_profile_versions.id", ondelete="SET NULL"), index=True
+    )
 
     posting: Mapped[JobPosting] = relationship(back_populates="applications")
     events: Mapped[list[ApplicationStatusEvent]] = relationship(
@@ -351,6 +366,7 @@ class ApplicationStatusEvent(Base):
     __table_args__ = (
         Index("ix_status_events_app_occurred", "application_id", "occurred_at"),
         Index("ix_status_events_to_status", "to_status"),
+        CheckConstraint("offered_salary IS NULL OR offered_salary >= 0", name="offered_salary"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -364,6 +380,11 @@ class ApplicationStatusEvent(Base):
         _enum(ApplicationStatus, "application_status"), nullable=False
     )
     note: Mapped[str | None] = mapped_column(Text)
+    # Strukturiertes Label (Absagegrund, Rückzugsgrund) und Jahresgehalt eines Angebots:
+    # wertvollste Zielgrößen für spätere Modelle, daher nicht im Freitext verstecken.
+    reason_code: Mapped[str | None] = mapped_column(String(32))
+    offered_salary: Mapped[int | None] = mapped_column(Integer)
+    offered_currency: Mapped[str | None] = mapped_column(String(3))
     occurred_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
 
@@ -558,6 +579,26 @@ class ApplicantProfile(TimestampMixin, Base):
     signature: Mapped[str | None] = mapped_column(Text)
 
 
+class ApplicantProfileVersion(Base):
+    """Append-only Schnappschuss des Profils (nur bei Änderung).
+
+    ``applicant_profiles`` wird überschrieben; ohne Verlauf wäre später nicht mehr
+    rekonstruierbar, mit welchem Stand (Skills, Lebenslauf, Wohnort) eine Bewerbung
+    rausging. ``content_hash`` verhindert Duplikate bei unveränderten Speichervorgängen.
+    """
+
+    __tablename__ = "applicant_profile_versions"
+    __table_args__ = (Index("ix_profile_versions_profile_created", "profile_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("applicant_profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+
 class CoverLetter(TimestampMixin, Base):
     """Eine Anschreiben-Version zu einer Stelle.
 
@@ -656,3 +697,27 @@ class PostingDocument(TimestampMixin, Base):
     detached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     document: Mapped[Document] = relationship()
+
+
+class DocumentPrimaryPeriod(Base):
+    """Zeitraum, in dem eine Unterlage Haupt-Lebenslauf war (``is_primary`` allein ist nur
+    der aktuelle Stand). Offen = ``ended_at IS NULL``."""
+
+    __tablename__ = "document_primary_periods"
+    __table_args__ = (
+        Index(
+            "uq_document_primary_open",
+            "document_id",
+            unique=True,
+            sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+        Index("ix_document_primary_started", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

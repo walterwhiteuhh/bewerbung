@@ -12,7 +12,7 @@ from pathlib import Path
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import Document, PostingDocument
+from bewerbung.db.models import Document, DocumentPrimaryPeriod, PostingDocument
 from bewerbung.db.types import utcnow
 from bewerbung.documents.extract import (
     EXTRACTOR_VERSION,
@@ -128,6 +128,7 @@ def upload(
     )
     session.add(doc)
     session.flush()
+    sync_primary_periods(session)
     logger.info(
         "Dokument %s hochgeladen (%s, %s Bytes, Text: %s)",
         doc.id,
@@ -164,6 +165,29 @@ def primary_cv(session: Session) -> Document | None:
     )
 
 
+def sync_primary_periods(session: Session) -> None:
+    """Zeiträume des Haupt-Lebenslaufs mit dem aktuellen Stand abgleichen (idempotent)."""
+    session.flush()
+    now = utcnow()
+    current = set(
+        session.scalars(
+            select(Document.id).where(Document.is_primary.is_(True), Document.archived_at.is_(None))
+        )
+    )
+    open_periods = {
+        p.document_id: p
+        for p in session.scalars(
+            select(DocumentPrimaryPeriod).where(DocumentPrimaryPeriod.ended_at.is_(None))
+        )
+    }
+    for doc_id, period in open_periods.items():
+        if doc_id not in current:
+            period.ended_at = now
+    for doc_id in current - open_periods.keys():
+        session.add(DocumentPrimaryPeriod(document_id=doc_id, started_at=now))
+    session.flush()
+
+
 def _clear_primary(session: Session, keep_id: int) -> None:
     session.execute(
         update(Document)
@@ -186,7 +210,7 @@ def update_document(session: Session, document_id: int, data: DocumentUpdate) ->
         if data.is_primary:
             _clear_primary(session, doc.id)
         doc.is_primary = data.is_primary
-    session.flush()
+    sync_primary_periods(session)
     return doc
 
 
@@ -195,7 +219,7 @@ def archive_document(session: Session, document_id: int) -> Document:
     doc = get_document(session, document_id)
     doc.archived_at = doc.archived_at or utcnow()
     doc.is_primary = False
-    session.flush()
+    sync_primary_periods(session)
     return doc
 
 

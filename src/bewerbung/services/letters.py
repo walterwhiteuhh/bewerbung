@@ -25,6 +25,7 @@ from bewerbung.domain.schemas import (
 )
 from bewerbung.letters.base import GenerationError, LetterContext, LetterGenerator
 from bewerbung.letters.prompt import PROMPT_VERSION
+from bewerbung.services import profile_history
 from bewerbung.services.postings import get_posting
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ def update_profile(session: Session, data: ProfileUpdate) -> ApplicantProfile:
     for key, value in data.model_dump().items():
         setattr(profile, key, value)
     session.flush()
+    profile_history.record_version(session, profile)
     return profile
 
 

@@ -15,7 +15,14 @@ from pydantic import (
     model_validator,
 )
 
-from bewerbung.domain.enums import ApplicationStatus, JobSource, OfferType, RemoteType, WorkTime
+from bewerbung.domain.enums import (
+    ApplicationStatus,
+    JobSource,
+    OfferType,
+    OutcomeReason,
+    RemoteType,
+    WorkTime,
+)
 from bewerbung.domain.ratings import RatingSource
 from bewerbung.domain.tags import unique_tags
 
@@ -247,6 +254,9 @@ class StatusEventRead(_Schema):
     from_status: ApplicationStatus | None
     to_status: ApplicationStatus
     note: str | None
+    reason_code: OutcomeReason | None
+    offered_salary: int | None
+    offered_currency: str | None
     occurred_at: datetime
     recorded_at: datetime
 
@@ -284,6 +294,13 @@ class StatusChange(_Schema):
     occurred_at: UtcDatetime | None = Field(
         default=None, description="Fachlicher Zeitpunkt; leer = jetzt. Rückdatieren erlaubt."
     )
+    reason_code: OutcomeReason | None = Field(
+        default=None, description="Grund; nur bei Absage, Rückzug oder Zusage/Angebot sinnvoll"
+    )
+    offered_salary: int | None = Field(
+        default=None, ge=0, le=10_000_000, description="Jahresgehalt eines Angebots"
+    )
+    offered_currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 
 class ApplicationUpdate(_Schema):
