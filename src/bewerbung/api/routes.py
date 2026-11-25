@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+import csv
+import io
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from bewerbung.api.deps import (
     AaLogosDep,
@@ -34,6 +36,7 @@ from bewerbung.domain.schemas import (
     GeneratorInfo,
     ImportPreview,
     ImportRequest,
+    JobFeatures,
     LetterContextPreview,
     ListingRead,
     NoteCreate,
@@ -42,6 +45,7 @@ from bewerbung.domain.schemas import (
     PostingDetail,
     PostingDocumentsUpdate,
     PostingFilter,
+    PostingInsights,
     PostingListItem,
     PostingPage,
     PostingUpdate,
@@ -64,6 +68,7 @@ from bewerbung.services import (
     companies,
     documents,
     importer,
+    insights,
     letters,
     postings,
     search,
@@ -259,7 +264,7 @@ async def run_search(
 ) -> SearchRunRead:
     """Gewählte Portale parallel durchsuchen; Fehler einzelner Portale stehen in ``errors``."""
     run = await search.run_search(session, registry, providers, data)
-    return SearchRunRead.model_validate(run)
+    return _run_with_features(session, run)
 
 
 @router.get("/search/runs", response_model=list[SearchRunSummary], tags=["search"])
@@ -282,7 +287,15 @@ def delete_run(session: SessionDep, run_id: int) -> None:
 
 @router.get("/search/runs/{run_id}", response_model=SearchRunRead, tags=["search"])
 def get_run(session: SessionDep, run_id: int) -> SearchRunRead:
-    return SearchRunRead.model_validate(search.get_run(session, run_id))
+    return _run_with_features(session, search.get_run(session, run_id))
+
+
+def _run_with_features(session: SessionDep, run: Any) -> SearchRunRead:
+    read = SearchRunRead.model_validate(run)
+    feats = insights.listing_features(session, [h.listing for h in run.hits])
+    for hit in read.hits:
+        hit.features = feats.get(hit.listing.id)
+    return read
 
 
 @router.get("/search/profiles", response_model=list[SearchProfileRead], tags=["search"])
@@ -312,6 +325,35 @@ def put_search_profile(
 )
 def delete_profile(session: SessionDep, profile_id: int) -> None:
     search.archive_profile(session, profile_id)
+
+
+@router.get("/listings/{listing_id}/features", response_model=JobFeatures, tags=["insights"])
+def listing_features(session: SessionDep, listing_id: int) -> JobFeatures:
+    listing = search.get_listing(session, listing_id)
+    return insights.listing_features(session, [listing])[listing.id]
+
+
+@router.get("/postings/{posting_id}/insights", response_model=PostingInsights, tags=["insights"])
+def posting_insights(session: SessionDep, posting_id: int) -> PostingInsights:
+    """Querbezüge: andere Portale, gleiche Firma, ähnliche Stellen, Merkmale."""
+    return insights.posting_insights(session, posting_id)
+
+
+@router.get("/insights/listings.csv", tags=["insights"])
+def export_features(session: SessionDep) -> StreamingResponse:
+    """Alle Anzeigen mit Merkmalen als CSV (Semikolon, UTF-8 mit BOM für Excel)."""
+    rows = list(insights.features_rows(session))  # Session lebt nur während der Anfrage
+    buf = io.StringIO()
+    buf.write("\ufeff")
+    fields = list(rows[0]) if rows else list(insights.EXPORT_COLUMNS)
+    writer = csv.DictWriter(buf, fieldnames=fields, delimiter=";")
+    writer.writeheader()
+    writer.writerows(rows)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="anzeigen-merkmale.csv"'},
+    )
 
 
 @router.get("/listings/{listing_id}", response_model=ListingRead, tags=["search"])
@@ -351,7 +393,9 @@ def get_profile(session: SessionDep) -> ProfileRead:
 
 @router.put("/profile", response_model=ProfileRead, tags=["letters"])
 def put_profile(session: SessionDep, data: ProfileUpdate) -> ProfileRead:
-    return ProfileRead.model_validate(letters.update_profile(session, data))
+    profile = letters.update_profile(session, data)
+    insights.locate_home(session, profile, None)
+    return ProfileRead.model_validate(profile)
 
 
 @router.get("/letters/generators", response_model=list[GeneratorInfo], tags=["letters"])

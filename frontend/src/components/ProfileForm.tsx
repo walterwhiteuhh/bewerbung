@@ -5,9 +5,9 @@ import { useMutate, useProfile } from "../api/hooks";
 import type { Profile } from "../api/types";
 import { useToast } from "./Toast";
 
-type Draft = Omit<Profile, "updated_at" | "skills"> & { skills: string };
+type Draft = Omit<Profile, "updated_at" | "skills" | "home_located"> & { skills: string };
 
-const toDraft = (p: Profile): Draft => ({ ...p, skills: p.skills.join(", ") });
+const toDraft = ({ home_located: _ignored, updated_at: _u, ...p }: Profile): Draft => ({ ...p, skills: p.skills.join(", ") });
 
 /** Eigene Angaben, aus denen Anschreiben entstehen. Wird einmal gepflegt und für jede Stelle genutzt. */
 export function ProfileForm({ onDone }: { onDone: () => void }) {
@@ -19,9 +19,9 @@ export function ProfileForm({ onDone }: { onDone: () => void }) {
 function ProfileFields({ initial, onDone }: { initial: Profile; onDone: () => void }) {
   const toast = useToast();
   const [d, setD] = useState<Draft>(() => toDraft(initial));
-  const save = useMutate((p: Omit<Profile, "updated_at">) => api.saveProfile(p));
+  const save = useMutate((p: Omit<Profile, "updated_at" | "home_located">) => api.saveProfile(p));
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((s) => ({ ...s, [k]: v }));
-  const text = (k: Exclude<keyof Draft, "skills">) => ({
+  const text = (k: Exclude<keyof Draft, "skills" | "max_distance_km">) => ({
     value: d[k] ?? "",
     onChange: (e: { target: { value: string } }) => set(k, e.target.value || null),
   });
@@ -60,6 +60,26 @@ function ProfileFields({ initial, onDone }: { initial: Profile; onDone: () => vo
         <span>Adresse</span>
         <input autoComplete="street-address" {...text("address")} />
       </label>
+      <label className="field">
+        <span>Wohnort (für Entfernungen)</span>
+        <input placeholder="z. B. 22769 Hamburg" {...text("home_location")} />
+      </label>
+      <label className="field">
+        <span>Maximale Entfernung (km)</span>
+        <input
+          type="number"
+          min={1}
+          max={1000}
+          inputMode="numeric"
+          value={d.max_distance_km ?? ""}
+          onChange={(e) => set("max_distance_km", e.target.value ? Number(e.target.value) : null)}
+        />
+      </label>
+      {d.home_location && initial.home_location === d.home_location && !initial.home_located && (
+        <p className="hint field--full">
+          Den Ort kenne ich noch nicht genau. Nach einer Suche in deiner Gegend (Arbeitsagentur) stehen die Koordinaten bereit.
+        </p>
+      )}
       <label className="field field--full">
         <span>Über mich</span>
         <textarea rows={4} placeholder="Was du kannst, was du suchst, worauf du stolz bist" {...text("summary")} />

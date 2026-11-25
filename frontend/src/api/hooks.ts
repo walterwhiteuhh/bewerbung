@@ -33,6 +33,9 @@ export const useLetters = (postingId: number) =>
 export const useLetterContext = (postingId: number) =>
   useQuery({ queryKey: keys.letterContext(postingId), queryFn: () => api.letterContext(postingId) });
 
+export const usePostingInsights = (postingId: number) =>
+  useQuery({ queryKey: ["posting-insights", postingId], queryFn: () => api.postingInsights(postingId) });
+
 export const useDocuments = () => useQuery({ queryKey: keys.documents, queryFn: api.documents });
 export const usePostingDocuments = (postingId: number) =>
   useQuery({ queryKey: keys.postingDocuments(postingId), queryFn: () => api.postingDocuments(postingId) });
@@ -52,6 +55,7 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
       void qc.invalidateQueries({ queryKey: keys.profile });
       void qc.invalidateQueries({ queryKey: keys.documents });
       void qc.invalidateQueries({ queryKey: ["posting-documents"] });
+      void qc.invalidateQueries({ queryKey: ["posting-insights"] });
     },
   });
 }

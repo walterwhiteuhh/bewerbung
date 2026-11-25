@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { CompanyLogo } from "./CompanyLogo";
 import { CompanySection } from "./CompanySection";
+import { InsightsSection } from "./Insights";
 
 import { api } from "../api/client";
 import { useLetters, useMutate, usePosting } from "../api/hooks";
@@ -77,6 +78,8 @@ export function PostingDetail({ id, onClose, onEdit, showClose, onOpenProfile }:
       </section>
 
       {p.company && <CompanySection company={p.company} />}
+
+      <InsightsSection postingId={p.id} />
 
       <TagsSection posting={p} />
 

@@ -24,6 +24,7 @@ from bewerbung.domain.schemas import (
 )
 from bewerbung.search.base import ListingDraft, SearchProvider, SearchQuery
 from bewerbung.services import postings
+from bewerbung.services.companies import derive_listing_keys
 from bewerbung.services.tags import add_tags
 from bewerbung.sources import SourceRegistry
 
@@ -81,6 +82,7 @@ def upsert_listing(
             raw_payload=draft.raw,
             **fields,
         )
+        derive_listing_keys(session, listing)
         session.add(listing)
         return listing, True
 
@@ -92,8 +94,11 @@ def upsert_listing(
                 setattr(listing, key, value)
         listing.content_hash = content_hash
         listing.raw_payload = draft.raw
+        derive_listing_keys(session, listing)
     if draft.company_logo_url and listing.company_logo_url != draft.company_logo_url:
         listing.company_logo_url = draft.company_logo_url  # nicht Teil des Inhalts-Hashs
+    if listing.title_key is None:  # Altbestand ohne abgeleitete Felder
+        derive_listing_keys(session, listing)
     listing.last_seen_at = now
     listing.expired_at = None
     return listing, False

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CompanyLogo } from "./CompanyLogo";
+import { FeatureChips } from "./Insights";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import { OFFER_TYPES, WORK_TIMES, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchRun, type WorkTime } from "../api/types";
+import { OFFER_TYPES, WORK_TIMES, type JobFeatures, type JobSource, type Listing, type OfferType, type SearchParams, type SearchProfile, type SearchHit, type SearchRun, type WorkTime } from "../api/types";
 import { formatDate, formatSalary, relativeTime } from "../lib/format";
 import { OFFER_TYPE_LABEL, REMOTE_LABEL, SOURCE_LABEL, WORK_TIME_LABEL } from "../lib/labels";
 import { MetaLine, SourceTag } from "./Badges";
@@ -35,6 +36,7 @@ export function SearchView({ onOpenPosting }: Props) {
   // Gerade bearbeitete gespeicherte Suche (null = neue Suche)
   const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
   const [onlyNew, setOnlyNew] = useState(false);
+  const [sort, setSort] = useState<HitSort>("rank");
 
   const available = (providers.data ?? []).filter((p) => p.available);
   const set = <K extends keyof SearchParams>(k: K, v: SearchParams[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -128,7 +130,7 @@ export function SearchView({ onOpenPosting }: Props) {
     );
   }
 
-  const hits = (run?.hits ?? []).filter((h) => !onlyNew || h.is_new);
+  const hits = sortHits((run?.hits ?? []).filter((h) => !onlyNew || h.is_new), sort);
 
   return (
     <div className="search-view">
@@ -286,10 +288,18 @@ export function SearchView({ onOpenPosting }: Props) {
             <span className="muted">
               {run.total_hits} Treffer, davon {run.new_hits} neu
             </span>
-            <label className="toggle">
-              <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-              Nur neue
-            </label>
+            <div className="results__tools">
+              <select value={sort} onChange={(e) => setSort(e.target.value as HitSort)} aria-label="Sortierung">
+                <option value="rank">Reihenfolge der Portale</option>
+                <option value="match">Beste Passung</option>
+                <option value="distance">Nächste zuerst</option>
+                <option value="fresh">Neueste zuerst</option>
+              </select>
+              <label className="toggle">
+                <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
+                Nur neue
+              </label>
+            </div>
           </div>
           {hits.length === 0 ? (
             <div className="empty">
@@ -299,7 +309,7 @@ export function SearchView({ onOpenPosting }: Props) {
           ) : (
             <ul className="list list--results">
               {hits.map((h) => (
-                <HitCard key={h.listing.id} listing={h.listing} isNew={h.is_new} onSaved={markSaved} onOpen={onOpenPosting} />
+                <HitCard key={h.listing.id} listing={h.listing} features={h.features} isNew={h.is_new} onSaved={markSaved} onOpen={onOpenPosting} />
               ))}
             </ul>
           )}
@@ -362,13 +372,35 @@ export function SearchView({ onOpenPosting }: Props) {
   );
 }
 
+type HitSort = "rank" | "match" | "distance" | "fresh";
+
+/** Sortierung nur in der Ansicht; fehlende Werte landen immer am Ende. */
+function sortHits(hits: SearchHit[], sort: HitSort): SearchHit[] {
+  if (sort === "rank") return hits;
+  const value = (h: SearchHit): number | null => {
+    const f = h.features;
+    if (!f) return null;
+    if (sort === "match") return f.match_score === null ? null : -f.match_score;
+    if (sort === "distance") return f.distance_km;
+    return f.age_days;
+  };
+  return [...hits].sort((a, b) => {
+    const va = value(a);
+    const vb = value(b);
+    if (va === null || vb === null) return va === null ? (vb === null ? a.rank - b.rank : 1) : -1;
+    return va - vb || a.rank - b.rank;
+  });
+}
+
 function HitCard({
   listing: l,
+  features,
   isNew,
   onSaved,
   onOpen,
 }: {
   listing: Listing;
+  features: JobFeatures | null;
   isNew: boolean;
   onSaved: (listingId: number, postingId: number) => void;
   onOpen: (postingId: number) => void;
@@ -401,6 +433,7 @@ function HitCard({
         <span>{l.company_name ?? "Firma unbekannt"}</span>
       </p>
       <MetaLine items={[l.location, l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
+      {features && <FeatureChips features={features} />}
       {l.description && (
         <p className={`card__desc ${expanded ? "is-open" : ""}`} onClick={() => setExpanded((x) => !x)}>
           {l.description}

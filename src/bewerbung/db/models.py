@@ -24,6 +24,7 @@ from sqlalchemy import (
     JSON,
     CheckConstraint,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -287,6 +288,7 @@ class Listing(TimestampMixin, Base):
         ),
         Index("ix_listings_url_normalized", "url_normalized"),
         Index("ix_listings_source_last_seen", "source", "last_seen_at"),
+        Index("ix_listings_company_title", "company_id", "title_key"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -301,6 +303,17 @@ class Listing(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     company_name: Mapped[str | None] = mapped_column(String(255))
     company_logo_url: Mapped[str | None] = mapped_column(String(2048))
+    # Abgeleitete Schlüssel für Querbezüge (gleiche Firma, gleiche Stelle auf anderen Portalen).
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), index=True
+    )
+    title_key: Mapped[str | None] = mapped_column(String(255))
+    # Strukturierter Ort aus den Rohdaten; Koordinaten nur, wenn die Quelle sie liefert.
+    city: Mapped[str | None] = mapped_column(String(120))
+    postal_code: Mapped[str | None] = mapped_column(String(10))
+    region: Mapped[str | None] = mapped_column(String(120))
+    lat: Mapped[float | None] = mapped_column(Float)
+    lon: Mapped[float | None] = mapped_column(Float)
     location: Mapped[str | None] = mapped_column(String(255))
     remote_type: Mapped[RemoteType] = mapped_column(
         _enum(RemoteType, "remote_type"), default=RemoteType.UNKNOWN, nullable=False
@@ -417,6 +430,16 @@ class ApplicantProfile(TimestampMixin, Base):
     summary: Mapped[str | None] = mapped_column(Text)
     skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     cv_text: Mapped[str | None] = mapped_column(Text)
+    # Wohnort für Entfernungen; Koordinaten werden aus bekannten Orten abgeleitet.
+    home_location: Mapped[str | None] = mapped_column(String(255))
+    home_lat: Mapped[float | None] = mapped_column(Float)
+    home_lon: Mapped[float | None] = mapped_column(Float)
+    max_distance_km: Mapped[int | None] = mapped_column(Integer)
+
+    @property
+    def home_located(self) -> bool:
+        return self.home_lat is not None and self.home_lon is not None
+
     signature: Mapped[str | None] = mapped_column(Text)
 
 

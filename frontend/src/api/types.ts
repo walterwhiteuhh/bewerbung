@@ -237,6 +237,64 @@ export interface SearchHit {
   rank: number;
   is_new: boolean;
   listing: Listing;
+  features: JobFeatures | null;
+}
+
+export interface CompanyActivity {
+  company_id: number;
+  listings: number;
+  active_listings: number;
+  portals: JobSource[];
+  saved_postings: number;
+  applications: number;
+  rejections: number;
+  last_status: ApplicationStatus | null;
+}
+
+export interface SimilarJob {
+  kind: "posting" | "listing";
+  id: number;
+  title: string;
+  company_name: string | null;
+  score: number;
+  shared: string[];
+}
+
+export interface JobFeatures {
+  city: string | null;
+  region: string | null;
+  distance_km: number | null;
+  distance_estimated: boolean;
+  within_max_distance: boolean | null;
+  age_days: number | null;
+  days_online: number | null;
+  times_seen: number;
+  portals: JobSource[];
+  is_repost: boolean;
+  match_score: number | null;
+  matched_skills: string[];
+  missing_skills: string[];
+  company: CompanyActivity | null;
+  similar_saved: SimilarJob | null;
+}
+
+export interface ListingBrief {
+  id: number;
+  posting_id: number | null;
+  source: JobSource;
+  title: string;
+  company_name: string | null;
+  city: string | null;
+  url: string | null;
+  last_seen_at: string;
+}
+
+export interface PostingInsights {
+  features: JobFeatures;
+  other_portals: ListingBrief[];
+  same_company_postings: SimilarJob[];
+  same_company_listings: ListingBrief[];
+  similar: SimilarJob[];
 }
 
 export const WORK_TIMES = ["vollzeit", "teilzeit", "minijob", "schicht"] as const;
@@ -301,6 +359,9 @@ export interface Profile {
   skills: string[];
   cv_text: string | null;
   signature: string | null;
+  home_location: string | null;
+  home_located?: boolean;
+  max_distance_km: number | null;
   updated_at?: string | null;
 }
 
