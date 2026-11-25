@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from bewerbung.db.models import JobPosting, PostingTag, Tag
 from bewerbung.db.types import utcnow
-from bewerbung.domain.schemas import TagCount
 from bewerbung.domain.tags import unique_tags
 
 logger = logging.getLogger(__name__)
@@ -53,16 +52,3 @@ def set_tags(session: Session, posting: JobPosting, names: list[str]) -> None:
         if tag_id not in wanted_ids:
             link.removed_at = now
     add_tags(session, posting, [t.name for t in tags])
-
-
-def list_tags(session: Session) -> list[TagCount]:
-    """Alle Hashtags mit Anzahl aktiver, nicht archivierter Stellen (Tags ohne Stellen fehlen)."""
-    rows = session.execute(
-        select(Tag.name, func.count(PostingTag.id))
-        .join(PostingTag, PostingTag.tag_id == Tag.id)
-        .join(JobPosting, JobPosting.id == PostingTag.posting_id)
-        .where(PostingTag.removed_at.is_(None), JobPosting.archived_at.is_(None))
-        .group_by(Tag.id, Tag.name)
-        .order_by(func.count(PostingTag.id).desc(), func.lower(Tag.name))
-    ).all()
-    return [TagCount(name=name, count=count) for name, count in rows]

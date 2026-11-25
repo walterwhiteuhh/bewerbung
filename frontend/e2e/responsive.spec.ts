@@ -132,6 +132,26 @@ for (const vp of VIEWPORTS) {
       expect(errors).toEqual([]);
     });
 
+    test("Hashtags übergreifend: Firma taggen, Übersicht zeigt die Firma", async ({ page }) => {
+      // Eigene Firma je Breite: alle Breiten teilen sich eine DB, parallele Tests dürfen sich nicht stören.
+      const tag = `firma${vp.width}`;
+      const created = await page.request.post("/api/postings", {
+        data: { title: `Tag-Test ${vp.width}`, company_name: `Tagfirma ${vp.width} GmbH` },
+      });
+      expect(created.ok()).toBeTruthy();
+      const { id } = await created.json();
+      await page.goto(`/#/stelle/${id}`);
+      const input = page.locator(".company__tags input");
+      await input.scrollIntoViewIfNeeded();
+      await input.fill(tag);
+      await input.press("Enter");
+      await expect(page.locator(".company__tags .hashtag", { hasText: `#${tag}` })).toBeVisible();
+      expect(await layoutIssues(page)).toEqual([]);
+      const resp = await page.request.get(`/api/tags/${tag}/overview`);
+      expect(resp.ok()).toBeTruthy();
+      expect((await resp.json()).company.map((c: { label: string }) => c.label)).toEqual([`Tagfirma ${vp.width} GmbH`]);
+    });
+
     test("Suche: Hashtags an Treffern filtern, #tag im Suchfeld", async ({ page }) => {
       await page.goto("/#/suche");
       await page.getByPlaceholder(/#python/).fill("data #python");

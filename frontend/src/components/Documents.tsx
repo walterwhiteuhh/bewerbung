@@ -5,6 +5,7 @@ import { useDocuments, useMutate, usePostingDocuments } from "../api/hooks";
 import { DOCUMENT_KINDS, type DocumentInfo, type DocumentKind } from "../api/types";
 import { formatDate } from "../lib/format";
 import { DOCUMENT_KIND_LABEL } from "../lib/labels";
+import { EntityTags } from "./EntityTags";
 import { useToast } from "./Toast";
 
 const ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg";
@@ -100,6 +101,9 @@ export function DocumentsPanel() {
                   {!d.has_text && " · kein Text erkannt"}
                 </span>
                 {d.text_preview && <p className="doc__preview">{d.text_preview}</p>}
+                <div className="doc__tags">
+                  <EntityTags type="document" id={d.id} placeholder="#hashtag, z. B. #python" />
+                </div>
                 <div className="doc__actions">
                   <select
                     aria-label="Art"

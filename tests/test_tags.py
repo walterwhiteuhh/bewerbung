@@ -41,8 +41,8 @@ def test_tags_on_create_update_and_filter(client: TestClient, make_posting) -> N
     assert client.get("/api/postings", params={"tag": "a/b"}).status_code == 422
 
     assert client.get("/api/tags").json() == [
-        {"name": "Python", "count": 2},
-        {"name": "remote", "count": 1},
+        {"name": "Python", "count": 2, "derived": False},
+        {"name": "remote", "count": 1, "derived": False},
     ]
 
     upd = client.patch(f"/api/postings/{b['id']}", json={"tags": ["hamburg"]}).json()

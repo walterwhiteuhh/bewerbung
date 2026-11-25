@@ -4,6 +4,7 @@ import type {
   ProviderInfo,
   SearchParams,
   SearchProfile,
+  EntityType,
   SearchRun,
   SearchRunSummary,
   Note,
@@ -15,6 +16,7 @@ import type {
   Stats,
   ApplicationStatus,
   TagCount,
+  TagOverview,
   Company,
   CompanyRatingCreate,
   CompanyUpdate,
@@ -113,6 +115,10 @@ export const api = {
   postingInsights: (id: number) => request<PostingInsights>(`/postings/${id}/insights`),
   stats: () => request<Stats>("/stats"),
   tags: () => request<TagCount[]>("/tags"),
+  tagOverview: (name: string) => request<TagOverview>(`/tags/${encodeURIComponent(name)}/overview`),
+  entityTags: (type: EntityType) => request<Record<string, string[]>>(`/tag-links/${type}`),
+  setEntityTags: (type: EntityType, id: number, tags: string[]) =>
+    request<string[]>(`/tag-links/${type}/${id}`, json("PUT", { tags })),
   providers: () => request<ProviderInfo[]>("/search/providers"),
   search: (p: SearchParams) => request<SearchRun>("/search", json("POST", p)),
   searchRuns: (p: { from?: string; to?: string; q?: string; limit?: number } = {}) =>

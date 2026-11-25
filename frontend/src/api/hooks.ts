@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
-import type { PostingFilter } from "./types";
+import type { EntityType, PostingFilter } from "./types";
 
 export const keys = {
   postings: (f: PostingFilter) => ["postings", f] as const,
@@ -59,3 +59,22 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
     },
   });
 }
+
+/** Hashtags aller Objekte eines Typs (ein Abruf für die ganze Liste). */
+export const useEntityTags = (type: EntityType) =>
+  useQuery({ queryKey: ["tag-links", type], queryFn: () => api.entityTags(type), staleTime: 15_000 });
+
+export function useSetEntityTags(type: EntityType) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tags }: { id: number; tags: string[] }) => api.setEntityTags(type, id, tags),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tag-links", type] });
+      void qc.invalidateQueries({ queryKey: keys.tags });
+    },
+  });
+}
+
+/** Alles zu einem Hashtag; 404 (Tag unbekannt) ist kein Fehler, dann gibt es einfach nichts. */
+export const useTagOverview = (name: string | null) =>
+  useQuery({ queryKey: ["tag-overview", name], queryFn: () => api.tagOverview(name!), enabled: !!name, retry: false, staleTime: 30_000 });
