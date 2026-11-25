@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 
 class JobSource(StrEnum):
@@ -63,4 +64,16 @@ _FUNNEL: dict[ApplicationStatus, int] = {
     ApplicationStatus.INTERVIEW: 3,
     ApplicationStatus.OFFER: 4,
     ApplicationStatus.ACCEPTED: 5,
+}
+
+
+# Filter der Portalsuche (Arbeitszeit, Angebotsart).
+WorkTime = Literal["vollzeit", "teilzeit", "minijob", "schicht"]
+OfferType = Literal["arbeit", "ausbildung", "praktikum", "selbststaendig"]
+
+WORK_TIME_LABEL: dict[str, str] = {
+    "vollzeit": "Vollzeit",
+    "teilzeit": "Teilzeit",
+    "minijob": "Minijob",
+    "schicht": "Schicht/Nacht/Wochenende",
 }

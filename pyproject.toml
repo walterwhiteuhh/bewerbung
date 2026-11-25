@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings>=2.6",
     "httpx>=0.28",
     "anthropic>=1",
+    "pypdf>=7.1.1",
+    "python-multipart>=0.0.34",
 ]
 
 [dependency-groups]

@@ -12,6 +12,8 @@ export const keys = {
   generators: ["generators"] as const,
   letters: (postingId: number) => ["letters", postingId] as const,
   letterContext: (postingId: number) => ["letter-context", postingId] as const,
+  documents: ["documents"] as const,
+  postingDocuments: (postingId: number) => ["posting-documents", postingId] as const,
 };
 
 export const usePostings = (f: PostingFilter) =>
@@ -31,6 +33,10 @@ export const useLetters = (postingId: number) =>
 export const useLetterContext = (postingId: number) =>
   useQuery({ queryKey: keys.letterContext(postingId), queryFn: () => api.letterContext(postingId) });
 
+export const useDocuments = () => useQuery({ queryKey: keys.documents, queryFn: api.documents });
+export const usePostingDocuments = (postingId: number) =>
+  useQuery({ queryKey: keys.postingDocuments(postingId), queryFn: () => api.postingDocuments(postingId) });
+
 /** Jede Änderung macht Listen, Detail und Kennzahlen ungültig: einfach und immer konsistent. */
 export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>) {
   const qc = useQueryClient();
@@ -44,6 +50,8 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
       void qc.invalidateQueries({ queryKey: ["letters"] });
       void qc.invalidateQueries({ queryKey: ["letter-context"] });
       void qc.invalidateQueries({ queryKey: keys.profile });
+      void qc.invalidateQueries({ queryKey: keys.documents });
+      void qc.invalidateQueries({ queryKey: ["posting-documents"] });
     },
   });
 }

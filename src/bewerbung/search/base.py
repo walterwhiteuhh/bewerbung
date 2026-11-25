@@ -9,7 +9,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
-from bewerbung.domain.enums import JobSource, RemoteType
+from bewerbung.domain.enums import JobSource, OfferType, RemoteType, WorkTime
 
 
 class SearchQuery(BaseModel):
@@ -17,6 +17,9 @@ class SearchQuery(BaseModel):
     location: str | None = Field(default=None, max_length=255)
     radius_km: int | None = Field(default=None, ge=0, le=200)
     remote_only: bool = False
+    # Leer = alle Arbeitszeiten. Mehrere Werte = ODER (z. B. Teilzeit oder Minijob).
+    work_times: list[WorkTime] = Field(default_factory=list)
+    offer_type: OfferType = "arbeit"
     limit: int = Field(default=50, ge=1, le=100)
 
 

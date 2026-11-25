@@ -325,6 +325,12 @@ class SearchProfile(TimestampMixin, Base):
     radius_km: Mapped[int | None] = mapped_column(Integer)
     sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
+    work_times: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    offer_type: Mapped[str] = mapped_column(
+        String(32), default="arbeit", server_default="arbeit", nullable=False
+    )
     archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     runs: Mapped[list[SearchRun]] = relationship(back_populates="profile")
@@ -345,6 +351,12 @@ class SearchRun(Base):
     radius_km: Mapped[int | None] = mapped_column(Integer)
     sources: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     remote_only: Mapped[bool] = mapped_column(default=False, nullable=False)
+    work_times: Mapped[list[str]] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    offer_type: Mapped[str] = mapped_column(
+        String(32), default="arbeit", server_default="arbeit", nullable=False
+    )
     started_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utcnow, nullable=False, index=True
     )
@@ -434,3 +446,65 @@ class CoverLetter(TimestampMixin, Base):
     duration_ms: Mapped[int | None] = mapped_column(Integer)
 
     posting: Mapped[JobPosting] = relationship()
+
+
+class Document(TimestampMixin, Base):
+    """Hochgeladene Unterlage (Lebenslauf, Zeugnis, Zertifikat ...).
+
+    Die Datei liegt inhaltsadressiert (``sha256``) im Dokumentenordner, nie unter dem
+    Namen, den der Browser mitschickt. ``text_content`` ist der ausgelesene Text samt
+    Extraktor-Version, damit er später neu berechnet oder für Features genutzt werden kann.
+    """
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        Index(
+            "uq_documents_sha256_active",
+            "sha256",
+            unique=True,
+            sqlite_where=text("archived_at IS NULL"),
+            postgresql_where=text("archived_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    text_content: Mapped[str | None] = mapped_column(Text)
+    extractor_version: Mapped[str | None] = mapped_column(String(16))
+    is_primary: Mapped[bool] = mapped_column(default=False, nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class PostingDocument(TimestampMixin, Base):
+    """Welche Unterlagen zu einer Bewerbung gehören. Entfernen setzt ``detached_at``."""
+
+    __tablename__ = "posting_documents"
+    __table_args__ = (
+        Index(
+            "uq_posting_documents_active",
+            "posting_id",
+            "document_id",
+            unique=True,
+            sqlite_where=text("detached_at IS NULL"),
+            postgresql_where=text("detached_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    posting_id: Mapped[int] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    attached_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    detached_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    document: Mapped[Document] = relationship()

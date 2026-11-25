@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
-import type { JobSource, Listing, SearchParams, SearchRun } from "../api/types";
+import { OFFER_TYPES, WORK_TIMES, type JobSource, type Listing, type OfferType, type SearchParams, type SearchRun, type WorkTime } from "../api/types";
 import { formatDate, formatSalary, relativeTime } from "../lib/format";
-import { REMOTE_LABEL, SOURCE_LABEL } from "../lib/labels";
+import { OFFER_TYPE_LABEL, REMOTE_LABEL, SOURCE_LABEL, WORK_TIME_LABEL } from "../lib/labels";
 import { MetaLine, SourceTag } from "./Badges";
 import { useToast } from "./Toast";
 
@@ -26,6 +26,8 @@ export function SearchView({ onOpenPosting }: Props) {
     location: "",
     radius_km: 25,
     remote_only: false,
+    work_times: [],
+    offer_type: "arbeit",
     sources: [],
   });
   const [run, setRun] = useState<SearchRun | null>(null);
@@ -48,11 +50,13 @@ export function SearchView({ onOpenPosting }: Props) {
   const saveProfile = useMutation({
     mutationFn: () =>
       api.createProfile({
-        name: [form.query, form.location].filter(Boolean).join(" · "),
+        name: [form.query, form.location, ...form.work_times.map((w) => WORK_TIME_LABEL[w])].filter(Boolean).join(" · "),
         query: form.query,
         location: form.location || null,
         radius_km: form.location ? form.radius_km : null,
         remote_only: form.remote_only,
+        work_times: form.work_times,
+        offer_type: form.offer_type,
         sources: form.sources,
       }),
     onSuccess: () => {
@@ -70,6 +74,10 @@ export function SearchView({ onOpenPosting }: Props) {
   function submit(e: FormEvent) {
     e.preventDefault();
     if (form.query.trim()) search.mutate(form);
+  }
+
+  function toggleWorkTime(w: WorkTime | null) {
+    set("work_times", w === null ? [] : form.work_times.includes(w) ? form.work_times.filter((x) => x !== w) : [...form.work_times, w]);
   }
 
   function toggleSource(s: JobSource) {
@@ -118,6 +126,36 @@ export function SearchView({ onOpenPosting }: Props) {
           </select>
         </label>
 
+        <div className="search-form__opts search-form__kind" role="group" aria-label="Arbeitszeit">
+          <span className="muted search-form__label">Arbeitszeit</span>
+          <button type="button" className={`chip ${form.work_times.length === 0 ? "is-active" : ""}`} onClick={() => toggleWorkTime(null)}>
+            Alle
+          </button>
+          {WORK_TIMES.map((w) => (
+            <button
+              key={w}
+              type="button"
+              className={`chip ${form.work_times.includes(w) ? "is-active" : ""}`}
+              aria-pressed={form.work_times.includes(w)}
+              onClick={() => toggleWorkTime(w)}
+            >
+              {WORK_TIME_LABEL[w]}
+            </button>
+          ))}
+          <select
+            className="search-form__offer"
+            aria-label="Art des Angebots"
+            value={form.offer_type}
+            onChange={(e) => set("offer_type", e.target.value as OfferType)}
+          >
+            {OFFER_TYPES.map((o) => (
+              <option key={o} value={o}>
+                {OFFER_TYPE_LABEL[o]}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="search-form__opts">
           {(providers.data ?? []).map((p) => (
             <button
@@ -156,7 +194,15 @@ export function SearchView({ onOpenPosting }: Props) {
               <button
                 type="button"
                 onClick={() => {
-                  const params = { query: p.query, location: p.location ?? "", radius_km: p.radius_km ?? 25, remote_only: p.remote_only, sources: p.sources };
+                  const params: SearchParams = {
+                    query: p.query,
+                    location: p.location ?? "",
+                    radius_km: p.radius_km ?? 25,
+                    remote_only: p.remote_only,
+                    work_times: p.work_times ?? [],
+                    offer_type: p.offer_type ?? "arbeit",
+                    sources: p.sources,
+                  };
                   setForm(params);
                   search.mutate({ ...params, profile_id: p.id });
                 }}
@@ -213,7 +259,9 @@ export function SearchView({ onOpenPosting }: Props) {
                     onClick={() => void api.searchRun(r.id).then(setRun).catch((e: Error) => toast(e.message, "error"))}
                   >
                     <strong>{r.query}</strong>
-                    <span>{[r.location, r.remote_only ? "Homeoffice" : null].filter(Boolean).join(" · ") || "überall"}</span>
+                    <span>{[r.location, r.remote_only ? "Homeoffice" : null, ...(r.work_times ?? []).map((w) => WORK_TIME_LABEL[w])]
+                        .filter(Boolean)
+                        .join(" · ") || "überall"}</span>
                     <span className="muted">
                       {r.total_hits} Treffer · {relativeTime(r.started_at)}
                     </span>

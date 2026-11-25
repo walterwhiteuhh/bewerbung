@@ -308,3 +308,57 @@ def test_adzuna_provider_mapping_and_missing_key() -> None:
     assert drafts[0].employment_type == "Vollzeit"
     assert drafts[1].salary_min is None  # geschätztes Gehalt nicht übernehmen
     assert drafts[0].remote_type is RemoteType.UNKNOWN
+
+
+def test_work_time_filter_is_passed_and_recorded(
+    search_client: TestClient, aa: FakeProvider
+) -> None:
+    run = search_client.post(
+        "/api/search",
+        json={"query": "verkauf", "work_times": ["minijob", "teilzeit"], "offer_type": "arbeit"},
+    ).json()
+    assert aa.queries[0].work_times == ["minijob", "teilzeit"]
+    assert run["work_times"] == ["minijob", "teilzeit"]
+    assert run["offer_type"] == "arbeit"
+    bad = search_client.post("/api/search", json={"query": "x", "work_times": ["egal"]})
+    assert bad.status_code == 422
+
+    prof = search_client.post(
+        "/api/search/profiles",
+        json={"name": "Minijobs HH", "query": "verkauf", "work_times": ["minijob"]},
+    ).json()
+    assert prof["work_times"] == ["minijob"]
+
+
+def test_arbeitsagentur_work_time_and_offer_codes() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        item = {"refnr": "1", "titel": "Aushilfe Verkauf", "arbeitgeber": "Laden"}
+        return httpx.Response(200, json={"stellenangebote": [item]})
+
+    provider = ArbeitsagenturProvider("k", transport=httpx.MockTransport(handler))
+    drafts = asyncio.run(provider.search(SearchQuery(query="verkauf", work_times=["minijob"])))
+    assert seen[0].url.params["arbeitszeit"] == "mj"
+    assert seen[0].url.params["angebotsart"] == "1"
+    assert drafts[0].employment_type == "Minijob"
+
+    asyncio.run(
+        provider.search(
+            SearchQuery(query="x", work_times=["teilzeit", "schicht"], offer_type="ausbildung")
+        )
+    )
+    assert seen[1].url.params["arbeitszeit"] == "tz;snw"
+    assert seen[1].url.params["angebotsart"] == "4"
+
+
+def test_adzuna_minijob_uses_part_time_and_keyword() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["what"] == "kasse minijob"
+        assert request.url.params["part_time"] == "1"
+        assert "full_time" not in request.url.params
+        return httpx.Response(200, json={"results": []})
+
+    provider = AdzunaProvider("id", "key", transport=httpx.MockTransport(handler))
+    assert asyncio.run(provider.search(SearchQuery(query="kasse", work_times=["minijob"]))) == []

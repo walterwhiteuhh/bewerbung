@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import ApplicantProfile, CoverLetter, JobPosting
+from bewerbung.db.models import ApplicantProfile, CoverLetter, Document, JobPosting
 from bewerbung.domain.enums import JobSource, RemoteType
 from bewerbung.domain.errors import DomainError, LetterGenerationError, NotFoundError
 from bewerbung.domain.keywords import suggest_tags
@@ -81,11 +81,30 @@ def update_profile(session: Session, data: ProfileUpdate) -> ApplicantProfile:
     return profile
 
 
-def _missing_profile_fields(profile: ApplicantProfile) -> list[str]:
+_MAX_CV_CHARS = 20_000
+
+
+def _cv_text(session: Session, profile: ApplicantProfile) -> str | None:
+    """Lebenslauf-Text aus dem Profil, sonst aus dem hochgeladenen Haupt-Lebenslauf."""
+    text = profile.cv_text
+    if not text:
+        text = session.scalar(
+            select(Document.text_content).where(
+                Document.kind == "lebenslauf",
+                Document.is_primary.is_(True),
+                Document.archived_at.is_(None),
+            )
+        )
+    if text and len(text) > _MAX_CV_CHARS:
+        text = text[:_MAX_CV_CHARS].rstrip() + " …"
+    return text
+
+
+def _missing_profile_fields(session: Session, profile: ApplicantProfile) -> list[str]:
     checks = {
         "Name": profile.full_name,
         "Kurzprofil": profile.headline,
-        "Über mich oder Lebenslauf": profile.summary or profile.cv_text,
+        "Über mich oder Lebenslauf": profile.summary or _cv_text(session, profile),
     }
     return [label for label, value in checks.items() if not value]
 
@@ -144,7 +163,7 @@ def build_context(session: Session, posting: JobPosting, req: CoverLetterRequest
         applicant_headline=profile.headline,
         applicant_summary=profile.summary,
         applicant_skills=list(profile.skills),
-        cv_text=profile.cv_text,
+        cv_text=_cv_text(session, profile),
         signature=profile.signature,
         tone=req.tone,
         length=req.length,
@@ -159,7 +178,7 @@ def preview_context(session: Session, posting_id: int) -> LetterContextPreview:
     posting = get_posting(session, posting_id)
     profile = get_profile(session)
     ctx = build_context(session, posting, CoverLetterRequest())
-    missing = _missing_profile_fields(profile)
+    missing = _missing_profile_fields(session, profile)
     excerpt = (posting.description or "").strip()
     return LetterContextPreview(
         portal=ctx.portal,

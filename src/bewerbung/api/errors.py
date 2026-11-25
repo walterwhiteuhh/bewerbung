@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from bewerbung.domain.errors import (
     DomainError,
+    DuplicateDocumentError,
     DuplicatePostingError,
     InvalidTransitionError,
     LetterGenerationError,
@@ -30,6 +31,10 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(DuplicatePostingError)
     async def _duplicate(_: Request, exc: DuplicatePostingError) -> JSONResponse:
+        return _error(status.HTTP_409_CONFLICT, str(exc), existing_id=exc.existing_id)
+
+    @app.exception_handler(DuplicateDocumentError)
+    async def _duplicate_doc(_: Request, exc: DuplicateDocumentError) -> JSONResponse:
         return _error(status.HTTP_409_CONFLICT, str(exc), existing_id=exc.existing_id)
 
     @app.exception_handler(InvalidTransitionError)
