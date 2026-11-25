@@ -26,6 +26,9 @@ export const SOURCES = [
   "join",
   "workday",
   "adzuna",
+  "jooble",
+  "arbeitnow",
+  "remotive",
   "manual",
   "other",
 ] as const;

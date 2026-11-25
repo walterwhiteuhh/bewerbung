@@ -29,6 +29,9 @@ export const SOURCE_LABEL: Record<JobSource, string> = {
   join: "JOIN",
   workday: "Workday",
   adzuna: "Adzuna",
+  jooble: "Jooble",
+  arbeitnow: "Arbeitnow",
+  remotive: "Remotive",
   manual: "Manuell",
   other: "Andere",
 };

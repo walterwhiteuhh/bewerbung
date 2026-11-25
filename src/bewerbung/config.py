@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     arbeitsagentur_api_key: str = "jobboerse-jobsuche"
     adzuna_app_id: str | None = Field(default=None, description="https://developer.adzuna.com")
     adzuna_app_key: str | None = None
+    jooble_api_key: str | None = Field(default=None, description="https://jooble.org/api/about")
+    jooble_base_url: str = "https://jooble.org/api/"
     search_timeout: float = 15.0
     # Anschreiben über Claude, GPT oder Gemini; ohne Key füllt die App eine Vorlage aus.
     anthropic_api_key: str | None = Field(
