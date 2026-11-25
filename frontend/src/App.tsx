@@ -70,42 +70,53 @@ export function App() {
 
   if (view === "search") {
     return (
-      <div className="app">
-        <header className="topbar topbar--search">
-          <div className="brand">
-            <span className="brand__mark" aria-hidden />
-            <h1>Bewerbungen</h1>
+      <div className="shell">
+        <header className="topbar">
+          <div className="topbar__inner topbar__inner--search">
+            <Brand />
+            {tabs}
           </div>
-          {tabs}
         </header>
-        <SearchView onOpenPosting={select} />
+        <div className="band band--search">
+          <div className="band__inner">
+            <h2 className="band__title">Neue Stellen finden</h2>
+            <p className="band__lead">Durchsucht die angebundenen Jobbörsen auf einmal. Treffer, die du merkst, landen in deinen Stellen.</p>
+          </div>
+        </div>
+        <div className="app">
+          <SearchView onOpenPosting={select} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`app ${detailOpen ? "has-detail" : ""}`}>
+    <div className={`shell ${detailOpen ? "has-detail" : ""}`}>
       <header className="topbar">
-        <div className="brand">
-          <span className="brand__mark" aria-hidden />
-          <h1>Bewerbungen</h1>
+        <div className="topbar__inner">
+          <Brand />
+          {tabs}
+          <label className="search">
+            <span className="sr-only">Suchen</span>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input type="search" placeholder="Titel, Firma, Ort …" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          <button type="button" className="btn btn--primary topbar__new" onClick={() => setForm({ mode: "create" })}>
+            Neue Stelle
+          </button>
         </div>
-        {tabs}
-        <label className="search">
-          <span className="sr-only">Suchen</span>
-          <svg viewBox="0 0 24 24" aria-hidden>
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          <input type="search" placeholder="Titel, Firma, Ort …" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <button type="button" className="btn btn--primary topbar__new" onClick={() => setForm({ mode: "create" })}>
-          + Neue Stelle
-        </button>
       </header>
 
-      <StatsBar selected={status} onToggle={toggleStatus} />
+      <div className="band">
+        <div className="band__inner">
+          <StatsBar selected={status} onToggle={toggleStatus} />
+        </div>
+      </div>
 
+      <div className="app">
       <main className="layout">
         <section className="pane pane--list" aria-label="Stellen">
           <div className="filters">
@@ -165,6 +176,7 @@ export function App() {
           )}
         </section>
       </main>
+      </div>
 
       <button type="button" className="fab" onClick={() => setForm({ mode: "create" })} aria-label="Neue Stelle">
         +
@@ -183,6 +195,19 @@ export function App() {
           />
         )}
       </Dialog>
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="brand">
+      <svg className="brand__mark" viewBox="0 0 28 28" aria-hidden>
+        <rect x="3" y="5" width="22" height="5" rx="2.5" />
+        <rect x="3" y="12" width="15" height="5" rx="2.5" />
+        <rect x="3" y="19" width="8" height="5" rx="2.5" />
+      </svg>
+      <h1>Bewerbungen</h1>
     </div>
   );
 }

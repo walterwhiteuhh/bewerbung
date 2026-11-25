@@ -5,7 +5,7 @@ import { useMutate, usePosting } from "../api/hooks";
 import type { Application, ApplicationStatus, PostingDetail as Posting } from "../api/types";
 import { formatDate, formatDateTime, formatSalary, isoToLocalDate, localDateToIso } from "../lib/format";
 import { EXITS, PIPELINE, REMOTE_LABEL, STATUS_LABEL } from "../lib/labels";
-import { Priority, SourceTag, StatusPill } from "./Badges";
+import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 import { useToast } from "./Toast";
 
 interface Props {
@@ -41,7 +41,7 @@ export function PostingDetail({ id, onClose, onEdit, showClose }: Props) {
             {p.archived_at && <span className="tag">Archiviert</span>}
           </div>
           <h2>{p.title}</h2>
-          <p className="card__company">{[p.company?.name, p.location].filter(Boolean).join(" · ") || "–"}</p>
+          <MetaLine className="detail__sub" items={[p.company?.name, p.location]} />
         </div>
         <div className="detail__actions">
           {p.url && (

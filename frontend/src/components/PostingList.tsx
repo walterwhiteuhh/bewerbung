@@ -1,7 +1,7 @@
 import type { PostingListItem } from "../api/types";
 import { formatSalary, relativeTime } from "../lib/format";
 import { REMOTE_LABEL } from "../lib/labels";
-import { Priority, SourceTag, StatusPill } from "./Badges";
+import { MetaLine, Priority, SourceTag, StatusPill } from "./Badges";
 
 interface Props {
   items: PostingListItem[];
@@ -40,14 +40,11 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
     <ul className="list">
       {items.map((p) => {
         const salary = formatSalary(p.salary_min, p.salary_max, p.salary_currency);
-        const meta = [p.location, p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]
-          .filter(Boolean)
-          .join(" · ");
         return (
           <li key={p.id}>
             <button
               type="button"
-              className={`card ${p.id === selectedId ? "is-selected" : ""}`}
+              className={`card ${p.application ? `status-${p.application.current_status}` : ""} ${p.id === selectedId ? "is-selected" : ""}`}
               onClick={() => onSelect(p.id)}
               aria-current={p.id === selectedId}
             >
@@ -57,7 +54,7 @@ export function PostingList({ items, selectedId, onSelect, loading, onCreate, fi
               </div>
               <h3 className="card__title">{p.title}</h3>
               <p className="card__company">{p.company?.name ?? "Firma unbekannt"}</p>
-              {meta && <p className="card__meta">{meta}</p>}
+              <MetaLine items={[p.location, p.remote_type !== "unknown" ? REMOTE_LABEL[p.remote_type] : null, salary]} />
               <div className="card__bottom">
                 <span className="muted">{relativeTime(p.updated_at)}</span>
                 {p.application && <Priority value={p.application.priority} />}
