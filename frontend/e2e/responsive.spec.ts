@@ -114,6 +114,20 @@ for (const vp of VIEWPORTS) {
       expect(errors).toEqual([]);
     });
 
+    test("Startseite: kein Überlauf, Button führt in die App", async ({ page }) => {
+      const errors: string[] = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1, name: /nächsten Job/ })).toBeVisible();
+      expect(await layoutIssues(page)).toEqual([]);
+      const cta = page.getByRole("link", { name: "Zur App" }).nth(1);
+      await expectInViewport(page, ".lp-cta .lp-btn");
+      if (vp.touch) expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await cta.click();
+      await expect(page.locator(".brand")).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+
     test("Detail: lange Titel und Firmennamen brechen um", async ({ page }) => {
       await page.goto("/#/");
       await page.locator(".card", { hasText: "Plattform-Architektur" }).first().click();

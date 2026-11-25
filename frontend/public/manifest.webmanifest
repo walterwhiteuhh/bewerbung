@@ -3,7 +3,7 @@
   "short_name": "Anheuern",
   "description": "Stellen aus allen Portalen finden, Bewerbungen steuern, Anschreiben erstellen.",
   "lang": "de",
-  "start_url": "/",
+  "start_url": "/#/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
