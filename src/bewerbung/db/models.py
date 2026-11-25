@@ -17,6 +17,7 @@ Designprinzipien:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -37,6 +38,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from bewerbung.db.types import UTCDateTime, utcnow
 from bewerbung.domain.enums import ApplicationStatus, JobSource, RemoteType
+from bewerbung.domain.ratings import EmployerScore, RatingValue, aggregate
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -89,6 +91,53 @@ class Company(TimestampMixin, Base):
     social_links: Mapped[dict[str, str] | None] = mapped_column(JSON)
 
     postings: Mapped[list[JobPosting]] = relationship(back_populates="company")
+    ratings: Mapped[list[CompanyRating]] = relationship(
+        back_populates="company",
+        order_by="CompanyRating.observed_at",
+        cascade="all, delete-orphan",
+    )
+
+    def current_ratings(self) -> list[CompanyRating]:
+        """Je Portal der zuletzt beobachtete Wert."""
+        latest: dict[str, CompanyRating] = {}
+        for r in self.ratings:  # aufsteigend nach observed_at
+            latest[r.source] = r
+        return list(latest.values())
+
+    @property
+    def employer_rating(self) -> EmployerScore | None:
+        """Mittel der Portale mit genügend Bewertungen; None, wenn nichts erfasst ist."""
+        current = self.current_ratings()
+        if not current:
+            return None
+        score = aggregate(RatingValue(r.source, r.rating, r.review_count) for r in current)
+        return replace(score, current=current)
+
+
+class CompanyRating(Base):
+    """Arbeitgeber-Bewertung eines Portals zu einem Zeitpunkt (append-only, Verlauf bleibt)."""
+
+    __tablename__ = "company_ratings"
+    __table_args__ = (
+        Index("ix_company_ratings_company_source", "company_id", "source", "observed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Auf 0..5 normalisiert; Originalwert und Skala bleiben für Nachvollziehbarkeit erhalten.
+    rating: Mapped[float] = mapped_column(Float, nullable=False)
+    raw_value: Mapped[float] = mapped_column(Float, nullable=False)
+    scale_max: Mapped[float] = mapped_column(Float, nullable=False)
+    review_count: Mapped[int | None] = mapped_column(Integer)
+    url: Mapped[str | None] = mapped_column(String(2048))
+    method: Mapped[str] = mapped_column(String(16), nullable=False)  # auto | manual
+    observed_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+    company: Mapped[Company] = relationship(back_populates="ratings")
 
 
 class JobPosting(TimestampMixin, Base):

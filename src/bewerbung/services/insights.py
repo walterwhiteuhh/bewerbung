@@ -38,6 +38,7 @@ from bewerbung.domain.keywords import suggest_tags
 from bewerbung.domain.matching import JobProfile, similarity, title_key
 from bewerbung.domain.schemas import (
     CompanyActivity,
+    EmployerRating,
     JobFeatures,
     ListingBrief,
     PostingInsights,
@@ -238,6 +239,11 @@ def _company_activity(
             portals=sorted(s["portals"], key=str),
             website=master[cid].website if cid in master else None,
             social_links=(master[cid].social_links or {}) if cid in master else {},
+            employer_rating=(
+                EmployerRating.model_validate(master[cid].employer_rating)
+                if cid in master and master[cid].employer_rating
+                else None
+            ),
             saved_postings=saved[cid],
             applications=applied[cid],
             rejections=rejected[cid],
@@ -491,6 +497,19 @@ EXPORT_COLUMNS = (
 )
 
 
+def _rating_columns(r: EmployerRating | None) -> dict[str, Any]:
+    """Aktueller Stand; ``employer_rating_observed_at`` erlaubt Filtern gegen Data Leakage."""
+    used = [c for c in r.current if c.source in r.sources] if r else []
+    return {
+        "employer_rating": r.mean if r else None,
+        "employer_rating_sources": " ".join(r.sources) if r else None,
+        "employer_review_count": r.review_count if r else None,
+        "employer_rating_observed_at": (
+            max(c.observed_at for c in used).isoformat() if used else None
+        ),
+    }
+
+
 def features_rows(session: Session, batch: int = 500) -> Iterator[dict[str, Any]]:
     """Alle Listings mit Merkmalen, flach; ``label_status`` = späteres Trainingslabel."""
     ctx = build_context(session)
@@ -542,5 +561,6 @@ def features_rows(session: Session, batch: int = 500) -> Iterator[dict[str, Any]
                 "company_applications": company.applications if company else None,
                 "company_rejections": company.rejections if company else None,
                 "similar_saved_score": f.similar_saved.score if f.similar_saved else None,
+                **_rating_columns(company.employer_rating if company else None),
             }
         last_id = chunk[-1].id

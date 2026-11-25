@@ -48,7 +48,38 @@ export interface Company {
   location: string | null;
   logo_source: "portal" | "website" | "manual" | null;
   social_links: SocialLinks;
+  employer_rating: EmployerRating | null;
   posting_count?: number | null;
+}
+
+export type RatingSource = "kununu" | "glassdoor" | "indeed" | "google" | "other";
+
+export interface CompanyRating {
+  id: number;
+  source: RatingSource;
+  rating: number;
+  raw_value: number;
+  scale_max: number;
+  review_count: number | null;
+  url: string | null;
+  method: "manual" | "auto";
+  observed_at: string;
+}
+
+export interface CompanyRatingCreate {
+  source: RatingSource;
+  value: number;
+  scale_max?: number;
+  review_count?: number | null;
+  url?: string | null;
+}
+
+export interface EmployerRating {
+  mean: number | null;
+  sources: RatingSource[];
+  review_count: number;
+  min_reviews: number;
+  current: CompanyRating[];
 }
 
 export type SocialNetwork = "linkedin" | "xing" | "kununu" | "instagram" | "facebook" | "youtube" | "x" | "tiktok" | "github";
@@ -252,6 +283,7 @@ export interface CompanyActivity {
   portals: JobSource[];
   website: string | null;
   social_links: SocialLinks;
+  employer_rating: EmployerRating | null;
   saved_postings: number;
   applications: number;
   rejections: number;

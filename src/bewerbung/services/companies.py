@@ -6,13 +6,14 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import Company, JobPosting, Listing
+from bewerbung.db.models import Company, CompanyRating, JobPosting, Listing
 from bewerbung.db.types import utcnow
 from bewerbung.domain.errors import DomainError, NotFoundError
 from bewerbung.domain.geo import place_from_payload
 from bewerbung.domain.logos import clean_logo_url
 from bewerbung.domain.matching import company_key, title_key
-from bewerbung.domain.schemas import CompanyRead, CompanyUpdate
+from bewerbung.domain.ratings import normalize
+from bewerbung.domain.schemas import CompanyRatingCreate, CompanyRead, CompanyUpdate
 from bewerbung.domain.socials import (
     classify_social,
     merge_socials,
@@ -159,4 +160,40 @@ async def fetch_logo_from_website(
     company.logo_fetched_at = utcnow()
     session.flush()
     logger.info("Website von Firma %s ausgewertet: Logo, %d Profile", company.id, len(site.socials))
+    return company
+
+
+# --- Arbeitgeber-Bewertungen ------------------------------------------------------
+
+
+def add_rating(session: Session, company_id: int, data: CompanyRatingCreate) -> Company:
+    """Neuen Stand eines Portals erfassen; frühere Werte bleiben als Verlauf erhalten."""
+    company = get_company(session, company_id)
+    url = normalize_website(data.url) if data.url else None
+    if data.url and url is None:
+        raise DomainError("Bitte einen gültigen Link zur Bewertungsseite angeben")
+    rating = CompanyRating(
+        source=data.source.value,
+        rating=normalize(data.value, data.scale_max),
+        raw_value=data.value,
+        scale_max=data.scale_max,
+        review_count=data.review_count,
+        url=url,
+        method="manual",
+    )
+    company.ratings.append(rating)
+    session.flush()
+    session.refresh(company, ["ratings"])
+    return company
+
+
+def delete_rating(session: Session, company_id: int, rating_id: int) -> Company:
+    """Fehleingabe entfernen (nur dieser Eintrag; der vorige Stand gilt dann wieder)."""
+    company = get_company(session, company_id)
+    rating = session.get(CompanyRating, rating_id)
+    if rating is None or rating.company_id != company.id:
+        raise NotFoundError("Bewertung", rating_id)
+    session.delete(rating)
+    session.flush()
+    session.refresh(company, ["ratings"])
     return company

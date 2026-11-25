@@ -6,6 +6,7 @@ import { SOURCE_LABEL } from "../lib/labels";
 import { CompanyLogo } from "./CompanyLogo";
 import { distanceLabel } from "./Insights";
 import { SocialLinks } from "./SocialLinks";
+import { RatingBadge } from "./EmployerRating";
 
 // --- Minikarte aus OpenStreetMap-Kacheln (ohne Kartenbibliothek) -------------------
 
@@ -175,6 +176,7 @@ function PlaceCardBody({ info }: { info: PlaceInfo }) {
             </div>
           </div>
         )}
+        {c?.employer_rating?.mean != null && <RatingBadge rating={c.employer_rating} />}
         {c && <SocialLinks links={c.social_links} website={c.website} />}
         {job && (
           <p className="placecard__links">

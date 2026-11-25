@@ -16,6 +16,7 @@ from pydantic import (
 )
 
 from bewerbung.domain.enums import ApplicationStatus, JobSource, OfferType, RemoteType, WorkTime
+from bewerbung.domain.ratings import RatingSource
 from bewerbung.domain.tags import unique_tags
 
 
@@ -142,6 +143,40 @@ class PostingUpdate(_Schema):
     tags: TagList | None = Field(default=None, description="Ersetzt alle Hashtags der Stelle")
 
 
+class CompanyRatingRead(_Schema):
+    id: int
+    source: RatingSource
+    rating: float = Field(description="auf 0..5 normalisiert")
+    raw_value: float
+    scale_max: float
+    review_count: int | None
+    url: str | None
+    method: str
+    observed_at: datetime
+
+
+class CompanyRatingCreate(_Schema):
+    source: RatingSource
+    value: float = Field(ge=0, le=100, description="Wert wie auf dem Portal angezeigt")
+    scale_max: float = Field(default=5, gt=0, le=100, description="Bestwert der Skala, meist 5")
+    review_count: int | None = Field(default=None, ge=0, le=10_000_000)
+    url: OptStr = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def _within_scale(self) -> Self:
+        if self.value > self.scale_max:
+            raise ValueError("Wert liegt über dem Bestwert der Skala")
+        return self
+
+
+class EmployerRating(_Schema):
+    mean: float | None = Field(description="Mittel auf 5er-Skala; None = zu wenige Bewertungen")
+    sources: list[RatingSource] = Field(description="Portale, die in den Mittelwert eingehen")
+    review_count: int
+    min_reviews: int
+    current: list[CompanyRatingRead] = Field(description="aktuellster Wert je Portal")
+
+
 class CompanyRead(_Schema):
     id: int
     name: str
@@ -151,6 +186,7 @@ class CompanyRead(_Schema):
     location: str | None = None
     logo_source: str | None = None
     social_links: dict[str, str] = Field(default_factory=dict)
+    employer_rating: EmployerRating | None = None
     posting_count: int | None = Field(default=None, description="Nur in der Firmenliste")
 
     @field_validator("social_links", mode="before")
@@ -546,6 +582,7 @@ class CompanyActivity(_Schema):
     portals: list[JobSource]
     website: str | None = None
     social_links: dict[str, str] = Field(default_factory=dict)
+    employer_rating: EmployerRating | None = None
     saved_postings: int
     applications: int = Field(description="Bewerbungen mit Status ab 'beworben'")
     rejections: int

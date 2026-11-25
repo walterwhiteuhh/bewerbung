@@ -24,6 +24,8 @@ from bewerbung.domain.errors import DomainError
 from bewerbung.domain.schemas import (
     ApplicationRead,
     ApplicationUpdate,
+    CompanyRatingCreate,
+    CompanyRatingRead,
     CompanyRead,
     CompanyUpdate,
     CoverLetterRead,
@@ -139,6 +141,37 @@ async def fetch_company_logo(
     """Logo von der hinterlegten Firmen-Website laden (ersetzt das bisherige Logo)."""
     company = await companies.fetch_logo_from_website(session, store, fetcher, company_id)
     return companies.to_read(company)
+
+
+@router.post(
+    "/companies/{company_id}/ratings",
+    response_model=CompanyRead,
+    status_code=status.HTTP_201_CREATED,
+    tags=["companies"],
+)
+def add_company_rating(
+    session: SessionDep, company_id: int, data: CompanyRatingCreate
+) -> CompanyRead:
+    """Arbeitgeber-Bewertung eines Portals erfassen (Wert, Skala, Anzahl Bewertungen)."""
+    return companies.to_read(companies.add_rating(session, company_id, data))
+
+
+@router.get(
+    "/companies/{company_id}/ratings",
+    response_model=list[CompanyRatingRead],
+    tags=["companies"],
+)
+def list_company_ratings(session: SessionDep, company_id: int) -> list[CompanyRatingRead]:
+    """Vollständiger Verlauf aller erfassten Bewertungen, älteste zuerst."""
+    company = companies.get_company(session, company_id)
+    return [CompanyRatingRead.model_validate(r) for r in company.ratings]
+
+
+@router.delete(
+    "/companies/{company_id}/ratings/{rating_id}", response_model=CompanyRead, tags=["companies"]
+)
+def delete_company_rating(session: SessionDep, company_id: int, rating_id: int) -> CompanyRead:
+    return companies.to_read(companies.delete_rating(session, company_id, rating_id))
 
 
 @router.get("/sources/detect", response_model=SourceDetection, tags=["sources"])

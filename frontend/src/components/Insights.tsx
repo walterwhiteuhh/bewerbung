@@ -38,6 +38,13 @@ export function FeatureChips({ features: f, hideCompany = false }: { features: J
   if (c && !hideCompany) {
     if (c.applications > 0) chips.push({ text: c.rejections ? `Firma: ${c.rejections}× Absage` : `Firma: ${c.applications}× beworben`, tone: c.rejections ? "warn" : "info" });
     else if (c.saved_postings > 0) chips.push({ text: `Firma: ${c.saved_postings}× gemerkt`, tone: "info" });
+    const r = c.employer_rating;
+    if (r?.mean != null)
+      chips.push({
+        text: `★ ${r.mean.toFixed(1).replace(".", ",")} Arbeitgeber`,
+        tone: r.mean >= 4 ? "good" : r.mean < 3 ? "warn" : undefined,
+        title: `Mittel aus ${r.sources.join(", ")} (${r.review_count} Bewertungen)`,
+      });
     if (c.listings > 1) chips.push({ text: `${c.listings} Anzeigen der Firma`, title: `${c.active_listings} davon in den letzten 14 Tagen gesehen` });
   }
   if (f.similar_saved) chips.push({ text: `ähnlich: ${f.similar_saved.title}`, title: `Ähnlichkeit ${pct(f.similar_saved.score)} · ${f.similar_saved.shared.join(", ")}` });
