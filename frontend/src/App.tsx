@@ -248,7 +248,9 @@ function Brand() {
         </g>
       </svg>
       <div className="brand__text">
-        <h1>Anheuern</h1>
+        <h1 aria-label="Anheuern">
+          An<span className="brand__accent">heuern</span>
+        </h1>
         <span className="brand__tag">Kurs auf den nächsten Job</span>
       </div>
     </div>
