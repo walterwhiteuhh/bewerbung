@@ -1,0 +1,17 @@
+{
+  "name": "Anheuern",
+  "short_name": "Anheuern",
+  "description": "Stellen aus allen Portalen finden, Bewerbungen steuern, Anschreiben erstellen.",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16203a",
+  "theme_color": "#16203a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1646,3 +1646,16 @@ a.doc__title:hover { color: var(--accent); text-decoration: underline; }
   100% { opacity: 0; transform: translateY(-6px); }
 }
 @keyframes ship-flag { to { transform: scaleY(0.7) skewY(6deg); } }
+
+
+/* --- Handy / installierte App ---------------------------------------------------- */
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+body { overscroll-behavior-y: none; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* iOS zoomt in Felder unter 16 px hinein; auf Touch-Geräten daher mindestens 16 px. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: max(16px, 1em); }
+}
+@media (display-mode: standalone) {
+  body { user-select: none; -webkit-user-select: none; }
+  input, textarea, [contenteditable], .letter, .prose { user-select: text; -webkit-user-select: text; }
+}
