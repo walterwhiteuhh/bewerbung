@@ -4,6 +4,9 @@ import { FeatureChips } from "./Insights";
 import { sortHits, type HitSort } from "../lib/sortHits";
 import { PlaceHover } from "./PlaceCard";
 import { RunHistory } from "./RunHistory";
+import { TagBar, TagList } from "./TagInput";
+import { filterByTags, portalQuery, tagCounts } from "../lib/hitTags";
+import { addUnique, sameTag } from "../lib/tags";
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api/client";
@@ -38,6 +41,7 @@ export function SearchView({ onOpenPosting }: Props) {
   // Gerade bearbeitete gespeicherte Suche (null = neue Suche)
   const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
   const [onlyNew, setOnlyNew] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [sort, setSort] = useState<HitSort>("rank");
 
   const available = (providers.data ?? []).filter((p) => p.available);
@@ -45,9 +49,10 @@ export function SearchView({ onOpenPosting }: Props) {
 
   const search = useMutation({
     mutationFn: (p: SearchParams) =>
-      api.search({ ...p, location: p.location?.trim() || null, radius_km: p.location?.trim() ? p.radius_km : null }),
+      api.search({ ...p, query: portalQuery(p.query), location: p.location?.trim() || null, radius_km: p.location?.trim() ? p.radius_km : null }),
     onSuccess: (r) => {
       setRun(r);
+      setTagFilter([]);
       void qc.invalidateQueries({ queryKey: ["runs"] });
       r.errors.forEach((e) => toast(`${SOURCE_LABEL[e.source as JobSource] ?? e.source}: ${e.message}`, "error"));
     },
@@ -118,7 +123,10 @@ export function SearchView({ onOpenPosting }: Props) {
     );
   }
 
-  const hits = sortHits((run?.hits ?? []).filter((h) => !onlyNew || h.is_new), sort);
+  const runHits = (run?.hits ?? []).filter((h) => !onlyNew || h.is_new);
+  const hits = sortHits(filterByTags(runHits, tagFilter), sort);
+  const toggleTag = (t: string) =>
+    setTagFilter((cur) => (cur.some((x) => sameTag(x, t)) ? cur.filter((x) => !sameTag(x, t)) : addUnique(cur, t)));
 
   return (
     <div className="search-view">
@@ -127,7 +135,7 @@ export function SearchView({ onOpenPosting }: Props) {
           <span>Was</span>
           <input
             required
-            placeholder="z. B. Data Scientist, Python"
+            placeholder="z. B. Data Scientist, Python oder #python"
             value={form.query}
             onChange={(e) => set("query", e.target.value)}
           />
@@ -289,6 +297,7 @@ export function SearchView({ onOpenPosting }: Props) {
               </label>
             </div>
           </div>
+          <TagBar tags={tagCounts(runHits)} selected={tagFilter} onToggle={toggleTag} />
           {hits.length === 0 ? (
             <div className="empty">
               <p className="empty__title">Keine Treffer</p>
@@ -297,7 +306,7 @@ export function SearchView({ onOpenPosting }: Props) {
           ) : (
             <ul className="list list--results">
               {hits.map((h) => (
-                <HitCard key={h.listing.id} listing={h.listing} features={h.features} isNew={h.is_new} onSaved={markSaved} onOpen={onOpenPosting} />
+                <HitCard key={h.listing.id} listing={h.listing} features={h.features} tags={h.tags} activeTags={tagFilter} onTag={toggleTag} isNew={h.is_new} onSaved={markSaved} onOpen={onOpenPosting} />
               ))}
             </ul>
           )}
@@ -318,12 +327,18 @@ export function SearchView({ onOpenPosting }: Props) {
 function HitCard({
   listing: l,
   features,
+  tags,
+  activeTags,
+  onTag,
   isNew,
   onSaved,
   onOpen,
 }: {
   listing: Listing;
   features: JobFeatures | null;
+  tags: string[];
+  activeTags: string[];
+  onTag: (tag: string) => void;
   isNew: boolean;
   onSaved: (listingId: number, postingId: number) => void;
   onOpen: (postingId: number) => void;
@@ -365,6 +380,7 @@ function HitCard({
         }
         items={[l.remote_type !== "unknown" ? REMOTE_LABEL[l.remote_type] : null, l.employment_type, salary]} />
       {features && <FeatureChips features={features} />}
+      <TagList tags={tags} active={activeTags} onToggle={onTag} />
       {l.description && (
         <p className={`card__desc ${expanded ? "is-open" : ""}`} onClick={() => setExpanded((x) => !x)}>
           {l.description}

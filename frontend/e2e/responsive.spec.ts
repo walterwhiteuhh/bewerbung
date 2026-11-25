@@ -132,6 +132,28 @@ for (const vp of VIEWPORTS) {
       expect(errors).toEqual([]);
     });
 
+    test("Suche: Hashtags an Treffern filtern, #tag im Suchfeld", async ({ page }) => {
+      await page.goto("/#/suche");
+      await page.getByPlaceholder(/#python/).fill("data #python");
+      await page.locator("button[type=submit].btn--primary").click();
+      await expect(page.locator(".card--hit").first()).toBeVisible();
+      const bar = page.getByRole("toolbar", { name: "Nach Hashtag filtern" });
+      await expect(bar).toBeVisible();
+      expect(await layoutIssues(page)).toEqual([]);
+      const total = await page.locator(".card--hit").count();
+      const first = bar.getByRole("button").first();
+      await first.click();
+      await expect(first).toHaveAttribute("aria-pressed", "true");
+      expect(await page.locator(".card--hit").count()).toBeLessThanOrEqual(total);
+      expect(await layoutIssues(page)).toEqual([]);
+      if (vp.touch) {
+        const small = (await smallTapTargets(page)).filter((t) => t.includes("hashtag"));
+        expect(small).toEqual([]);
+      }
+      await first.click(); // Filter wieder aus
+      await expect(page.locator(".card--hit")).toHaveCount(total);
+    });
+
     test("Verlauf: Menü bleibt im Bild, Auswahl entfernt Suchen", async ({ page }) => {
       page.on("dialog", (d) => void d.accept());
       // Alle Breiten teilen sich einen Server: eigener Suchbegriff, damit parallele Tests sich nicht stören.

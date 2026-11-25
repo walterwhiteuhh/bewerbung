@@ -490,3 +490,14 @@ def test_search_persist_uses_constant_number_of_queries(settings: Settings) -> N
         # Antwort inkl. Merkmale mitgezählt; mit 60 statt 6 Treffern käme ein Vielfaches
         assert n_first < 60, n_first
         assert len(selects) < 60, len(selects)
+
+
+def test_hits_carry_hashtags(search_client: TestClient) -> None:
+    """Treffer zeigen Vorschläge; nach dem Merken die echten Hashtags der Stelle."""
+    run = search_client.post("/api/search", json={"query": "data"}).json()
+    hit = next(h for h in run["hits"] if h["listing"]["title"] == "Data Scientist")
+    assert "data-science" in hit["tags"]
+    search_client.post(f"/api/listings/{hit['listing']['id']}/save", json={})
+    again = search_client.get(f"/api/search/runs/{run['id']}").json()
+    saved = next(h for h in again["hits"] if h["listing"]["id"] == hit["listing"]["id"])
+    assert "data-science" in saved["tags"]  # jetzt als echter Hashtag der Stelle

@@ -81,5 +81,5 @@ export function listing(over: Partial<Listing> = {}): Listing {
 }
 
 export function hit(rank: number, f: Partial<JobFeatures> | null): SearchHit {
-  return { rank, is_new: false, listing: listing({ id: rank }), features: f ? features(f) : null };
+  return { rank, is_new: false, listing: listing({ id: rank }), features: f ? features(f) : null, tags: [] };
 }

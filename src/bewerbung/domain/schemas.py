@@ -393,6 +393,8 @@ class SearchHitRead(_Schema):
     is_new: bool
     listing: ListingRead
     features: JobFeatures | None = None
+    # Hashtags des Treffers: bei gemerkten Stellen die gesetzten, sonst regelbasierte Vorschläge.
+    tags: list[str] = Field(default_factory=list)
 
 
 class SearchError(_Schema):
