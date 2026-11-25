@@ -31,18 +31,20 @@ from bewerbung.search.providers import build_providers
 from bewerbung.services.documents import DocumentStore
 from bewerbung.sources import default_registry
 from bewerbung.sources.fetcher import HttpPageFetcher, PageFetcher
+from bewerbung.sources.site_logo import LogoStore, SiteLogoFetcher
 
 logger = logging.getLogger(__name__)
 
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
-def create_app(
+def create_app(  # noqa: PLR0917 - Test-Injektion aller externen Dienste
     settings: Settings | None = None,
     page_fetcher: PageFetcher | None = None,
     search_providers: list[SearchProvider] | None = None,
     letter_generators: dict[str, LetterGenerator] | None = None,
     aa_logos: AaLogoCache | None = None,
+    site_logos: SiteLogoFetcher | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -70,6 +72,8 @@ def create_app(
     app.state.aa_logos = aa_logos or AaLogoCache(
         resolve_logos_dir(settings), settings.arbeitsagentur_api_key
     )
+    app.state.logo_store = LogoStore(resolve_logos_dir(settings))
+    app.state.site_logos = site_logos or SiteLogoFetcher(timeout=settings.fetch_timeout)
     app.state.max_upload_bytes = settings.max_upload_mb * 1024 * 1024
 
     register_error_handlers(app)

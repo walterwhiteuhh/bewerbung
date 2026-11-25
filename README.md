@@ -151,6 +151,15 @@ Arbeitsagentur-Logos brauchen den API-Key-Header; deshalb holt der Server sie ü
 werden eine Woche lang nicht erneut angefragt, SVG wird nicht angenommen). Ohne Logo zeigt die
 Oberfläche die Initialen der Firma. Migration 0008 trägt Logos aus vorhandenen Rohdaten nach.
 
+Liefert die Quelle kein Logo (z. B. die Arbeitsagentur, deren Logo-Endpunkt mit 403 antwortet),
+kann in der Stelle unter „Firma“ die Website eingetragen werden. Die App lädt dann die Startseite,
+wählt `apple-touch-icon` vor SVG- und PNG-Favicons (Rückfall `/favicon.ico`) und speichert das
+Bild inhaltsadressiert in `data/logos/` (`/api/logos/files/<sha256>.<ext>`). Interne Adressen
+werden wie beim Import abgelehnt, SVG wird mit `Content-Security-Policy: sandbox` ausgeliefert.
+Website, Branche und Firmensitz gelten für alle Stellen der Firma (`PATCH /api/companies/{id}`,
+`POST /api/companies/{id}/logo`). Beim Import wird `hiringOrganization.sameAs`/`url` als Website
+übernommen, sofern es keine Portal-Adresse ist.
+
 ### Neue Quelle anbinden
 
 ```python

@@ -28,6 +28,7 @@ from bewerbung.domain.schemas import (
     SourceDetection,
 )
 from bewerbung.domain.tags import tag_key
+from bewerbung.services import companies
 from bewerbung.services.companies import get_or_create_company
 from bewerbung.services.tags import add_tags, set_tags
 from bewerbung.sources import SourceReference, SourceRegistry
@@ -77,8 +78,8 @@ def create_posting(
 
     logo_url = data.company_logo_url or logo_from_payload(data.raw_payload)
     company = get_or_create_company(session, data.company_name) if data.company_name else None
-    if company is not None and logo_url and not company.logo_url:
-        company.logo_url = logo_url
+    if company is not None:
+        companies.enrich_from_posting(company, logo_url, data.raw_payload)
     posting = JobPosting(
         title=data.title,
         company=company,
@@ -170,8 +171,10 @@ def update_posting(
     if "company_name" in changes:
         name = changes.pop("company_name")
         posting.company = get_or_create_company(session, name) if name else None
-        if posting.company is not None and not posting.company.logo_url:
-            posting.company.logo_url = logo_from_payload(posting.raw_payload)
+        if posting.company is not None:
+            companies.enrich_from_posting(
+                posting.company, logo_from_payload(posting.raw_payload), posting.raw_payload
+            )
     if "url" in changes:
         url = changes.pop("url")
         posting.url = url

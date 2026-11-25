@@ -34,7 +34,7 @@ class PageFetcher(Protocol):
     async def fetch(self, url: str) -> str: ...
 
 
-async def _assert_public_host(url: str) -> None:
+async def assert_public_host(url: str) -> None:
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"} or not parts.hostname:
         raise FetchError("Nur http- und https-Adressen können geladen werden")
@@ -61,7 +61,7 @@ class HttpPageFetcher:
             current = url
             for _ in range(MAX_REDIRECTS + 1):
                 if self._check_host:
-                    await _assert_public_host(current)
+                    await assert_public_host(current)
                 try:
                     async with client.stream("GET", current) as resp:
                         if resp.is_redirect and "location" in resp.headers:

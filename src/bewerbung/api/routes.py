@@ -12,14 +12,18 @@ from bewerbung.api.deps import (
     DocumentStoreDep,
     FetcherDep,
     LetterGeneratorsDep,
+    LogoStoreDep,
     ProvidersDep,
     RegistryDep,
     SessionDep,
+    SiteLogosDep,
 )
 from bewerbung.domain.errors import DomainError
 from bewerbung.domain.schemas import (
     ApplicationRead,
     ApplicationUpdate,
+    CompanyRead,
+    CompanyUpdate,
     CoverLetterRead,
     CoverLetterRequest,
     CoverLetterUpdate,
@@ -57,6 +61,7 @@ from bewerbung.domain.schemas import (
 )
 from bewerbung.services import (
     applications,
+    companies,
     documents,
     importer,
     letters,
@@ -65,6 +70,7 @@ from bewerbung.services import (
     stats,
     tags,
 )
+from bewerbung.sources.site_logo import MEDIA_TYPES
 
 router = APIRouter(prefix="/api")
 
@@ -85,6 +91,49 @@ async def arbeitsagentur_logo(cache: AaLogosDep, logo_hash: str) -> FileResponse
         media_type=logo.media_type,
         headers={"Cache-Control": "public, max-age=604800", "X-Content-Type-Options": "nosniff"},
     )
+
+
+@router.get("/logos/files/{name}", tags=["companies"], include_in_schema=False)
+def logo_file(store: LogoStoreDep, name: str) -> FileResponse:
+    """Lokal abgelegtes Firmenlogo (von der Firmen-Website geladen)."""
+    path = store.path(name)
+    if path is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kein Logo")
+    ext = name.rsplit(".", 1)[-1]
+    return FileResponse(
+        path,
+        media_type=MEDIA_TYPES[ext],
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",  # Name = Inhalts-Hash
+            "X-Content-Type-Options": "nosniff",
+            # SVG darf beim direkten Öffnen keine Skripte ausführen.
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        },
+    )
+
+
+@router.get("/companies", response_model=list[CompanyRead], tags=["companies"])
+def list_companies(session: SessionDep) -> list[CompanyRead]:
+    return [companies.to_read(c, n) for c, n in companies.list_companies(session)]
+
+
+@router.get("/companies/{company_id}", response_model=CompanyRead, tags=["companies"])
+def get_company(session: SessionDep, company_id: int) -> CompanyRead:
+    return companies.to_read(companies.get_company(session, company_id))
+
+
+@router.patch("/companies/{company_id}", response_model=CompanyRead, tags=["companies"])
+def update_company(session: SessionDep, company_id: int, data: CompanyUpdate) -> CompanyRead:
+    return companies.to_read(companies.update_company(session, company_id, data))
+
+
+@router.post("/companies/{company_id}/logo", response_model=CompanyRead, tags=["companies"])
+async def fetch_company_logo(
+    session: SessionDep, store: LogoStoreDep, fetcher: SiteLogosDep, company_id: int
+) -> CompanyRead:
+    """Logo von der hinterlegten Firmen-Website laden (ersetzt das bisherige Logo)."""
+    company = await companies.fetch_logo_from_website(session, store, fetcher, company_id)
+    return companies.to_read(company)
 
 
 @router.get("/sources/detect", response_model=SourceDetection, tags=["sources"])

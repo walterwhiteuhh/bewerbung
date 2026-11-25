@@ -15,6 +15,8 @@ import type {
   Stats,
   ApplicationStatus,
   TagCount,
+  Company,
+  CompanyUpdate,
   CoverLetter,
   GeneratorInfo,
   LetterContext,
@@ -90,6 +92,9 @@ export const api = {
   updateApplication: (appId: number, data: Partial<Pick<Application, "priority" | "contact_name" | "contact_email" | "follow_up_at">>) =>
     request<Application>(`/applications/${appId}`, json("PATCH", data)),
   addNote: (appId: number, body: string) => request<Note>(`/applications/${appId}/notes`, json("POST", { body })),
+  companies: () => request<Company[]>("/companies"),
+  updateCompany: (id: number, data: CompanyUpdate) => request<Company>(`/companies/${id}`, json("PATCH", data)),
+  fetchCompanyLogo: (id: number) => request<Company>(`/companies/${id}/logo`, { method: "POST" }),
   stats: () => request<Stats>("/stats"),
   tags: () => request<TagCount[]>("/tags"),
   providers: () => request<ProviderInfo[]>("/search/providers"),
