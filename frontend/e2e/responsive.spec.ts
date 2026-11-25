@@ -123,6 +123,10 @@ for (const vp of VIEWPORTS) {
       const cta = page.getByRole("link", { name: "Zur App" }).nth(1);
       await expectInViewport(page, ".lp-cta .lp-btn");
       if (vp.touch) expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await page.locator(".lp-ticker").evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await expectInViewport(page, ".lp-ticker");
+      await page.locator(".lp-ticker__toggle").click(); // anhalten, Layout bleibt stabil
+      expect(await layoutIssues(page)).toEqual([]);
       await cta.click();
       await expect(page.locator(".brand")).toBeVisible();
       expect(errors).toEqual([]);
