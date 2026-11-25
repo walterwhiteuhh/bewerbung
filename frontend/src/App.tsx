@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { usePostings, useStats } from "./api/hooks";
 import { SOURCES, type ApplicationStatus, type JobSource, type PostingDetail as Posting, type PostingFilter, type SortField } from "./api/types";
@@ -16,6 +16,7 @@ import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
 import { TagFilterBar } from "./components/TagInput";
 import { SOURCE_LABEL } from "./lib/labels";
+import { clearSharedUrl, peekSharedUrl } from "./lib/shareTarget";
 import { addUnique, sameTag, splitHashtags } from "./lib/tags";
 import { useDebounced, useMediaQuery, useSelectedId, useView } from "./lib/useHashRoute";
 
@@ -42,7 +43,10 @@ function Workspace() {
   const [view, setView] = useView();
   const [extra, setExtra] = useState(EMPTY_EXTRA);
   const [showFilters, setShowFilters] = useState(false);
-  const [form, setForm] = useState<FormState>(null);
+  // Per „Teilen → Anheuern“ übergebene Anzeigen-URL: Formular direkt vorbefüllt öffnen.
+  const [sharedUrl] = useState(peekSharedUrl);
+  useEffect(() => clearSharedUrl(), []);
+  const [form, setForm] = useState<FormState>(sharedUrl ? { mode: "create" } : null);
   const [profileTab, setProfileTab] = useState<ProfileTab | null>(null);
 
   const [q, setQ] = useState("");
@@ -238,6 +242,7 @@ function Workspace() {
         {form && (
           <PostingForm
             initial={form.mode === "edit" ? form.posting : undefined}
+            prefillUrl={form.mode === "create" ? sharedUrl ?? undefined : undefined}
             onDone={openFromForm}
             onOpenExisting={openFromForm}
           />
