@@ -7,6 +7,9 @@ import { ToastProvider } from "./components/Toast";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/ibm-plex-sans";
 import "./styles.css";
+import { captureSharedUrl } from "./lib/shareTarget";
+
+captureSharedUrl();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15_000, refetchOnWindowFocus: true, retry: 1 } },

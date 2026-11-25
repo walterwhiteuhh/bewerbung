@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { ApiError, api } from "../api/client";
 import { useMutate } from "../api/hooks";
@@ -19,17 +19,19 @@ import { useToast } from "./Toast";
 
 interface Props {
   initial?: PostingDetail;
+  /** Vorbefüllte Anzeigen-URL (Teilen-Ziel); wird sofort geladen. */
+  prefillUrl?: string;
   onDone: (id: number) => void;
   onOpenExisting: (id: number) => void;
 }
 
 const toInt = (v: string) => (v.trim() === "" ? null : Math.max(0, Math.round(Number(v))));
 
-export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
+export function PostingForm({ initial, prefillUrl, onDone, onOpenExisting }: Props) {
   const toast = useToast();
   const editing = initial !== undefined;
   const [f, setF] = useState({
-    url: initial?.url ?? "",
+    url: initial?.url ?? prefillUrl ?? "",
     title: initial?.title ?? "",
     company_name: initial?.company?.name ?? "",
     location: initial?.location ?? "",
@@ -84,6 +86,14 @@ export function PostingForm({ initial, onDone, onOpenExisting }: Props) {
       setImporting(false);
     }
   }
+
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!prefillUrl || editing || prefilled.current) return;
+    prefilled.current = true;
+    void detect(prefillUrl);
+    void loadFromUrl(prefillUrl);
+  }, []);
 
   const save = useMutate((data: PostingInput) =>
     editing ? api.updatePosting(initial.id, data) : api.createPosting(data),
