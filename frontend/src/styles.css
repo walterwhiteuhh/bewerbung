@@ -1785,3 +1785,32 @@ body { overscroll-behavior-y: none; padding-left: env(safe-area-inset-left); pad
 /* 4K: alles proportional größer, damit die Seite nicht verloren wirkt. */
 @media (min-width: 2400px) { .lp { --lp-max: 110rem; font-size: 20px; } }
 @media (min-width: 3200px) { .lp { --lp-max: 130rem; font-size: 26px; } }
+
+/* --- Verlauf der letzten Suchen: Filter, Gruppen, Auswahl, Menü ------------------ */
+.recent__tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.recent__filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.recent__filters input[type="search"] {
+  flex: 1 1 160px; min-width: 0; min-height: 40px; padding: 0 12px; font-size: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+}
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.seg button { min-height: 40px; padding: 0 12px; border: 0; background: none; font-size: 0.88rem; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.is-active { background: var(--accent); color: var(--accent-contrast); }
+.recent__bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 0.9rem; }
+.recent__bar span { margin-right: auto; }
+.recent__group { margin-bottom: 14px; }
+.recent__day { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.recent__day h4 { margin: 0; font: 650 0.78rem var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.recent__check { width: 22px; height: 22px; align-self: center; accent-color: var(--accent); }
+.recent__row:has(.recent__check) { grid-template-columns: auto 1fr; }
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu__list {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: grid; min-width: 14rem; padding: 6px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 12px 30px rgb(12 17 29 / 0.18);
+}
+.menu__list button { min-height: 44px; padding: 0 12px; text-align: left; border: 0; border-radius: 8px; background: none; }
+.menu__list button:hover { background: var(--surface-2); }
+.menu__list .menu__danger { color: var(--danger); }

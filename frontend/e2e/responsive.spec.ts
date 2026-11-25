@@ -128,6 +128,30 @@ for (const vp of VIEWPORTS) {
       expect(errors).toEqual([]);
     });
 
+    test("Verlauf: Menü bleibt im Bild, Auswahl entfernt Suchen", async ({ page }) => {
+      page.on("dialog", (d) => void d.accept());
+      // Alle Breiten teilen sich einen Server: eigener Suchbegriff, damit parallele Tests sich nicht stören.
+      const term = `verlauf ${vp.width}`;
+      await page.goto("/#/suche");
+      await page.getByPlaceholder("z. B. Data Scientist, Python").fill(term);
+      await page.locator("button[type=submit].btn--primary").click();
+      await expect(page.locator(".card--hit").first()).toBeVisible();
+      await page.reload(); // frische Ansicht: ohne geöffnetes Ergebnis zeigt die Suche den Verlauf
+      await page.getByLabel("Verlauf durchsuchen").fill(term);
+      const rows = page.locator(".recent__row");
+      await expect(rows).toHaveCount(1);
+      expect(await layoutIssues(page)).toEqual([]);
+      await page.locator(".menu > summary").evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await page.locator(".menu > summary").click();
+      await expectInViewport(page, ".menu__list");
+      await page.locator(".menu > summary").click();
+      await page.getByRole("button", { name: "Auswählen" }).click();
+      await page.locator(".recent__check").first().check();
+      expect(await layoutIssues(page)).toEqual([]);
+      await page.getByRole("button", { name: "Entfernen" }).click();
+      await expect(rows).toHaveCount(0);
+    });
+
     test("Detail: lange Titel und Firmennamen brechen um", async ({ page }) => {
       await page.goto("/#/");
       await page.locator(".card", { hasText: "Plattform-Architektur" }).first().click();

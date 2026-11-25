@@ -7,8 +7,9 @@ import logging
 from collections.abc import Sequence
 from datetime import datetime
 from itertools import chain, zip_longest
+from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from bewerbung.db.models import JobPosting, Listing, SearchHit, SearchProfile, SearchRun
@@ -182,11 +183,33 @@ def get_run(session: Session, run_id: int) -> SearchRun:
     return run
 
 
-def list_runs(session: Session, limit: int = 20) -> list[SearchRun]:
+def _run_filters(
+    started_from: datetime | None, started_to: datetime | None, text: str | None
+) -> list[Any]:
+    conds: list[Any] = []
+    if started_from is not None:
+        conds.append(SearchRun.started_at >= started_from)
+    if started_to is not None:
+        conds.append(SearchRun.started_at < started_to)
+    if text and text.strip():
+        like = f"%{text.strip()}%"
+        conds.append(or_(SearchRun.query.ilike(like), SearchRun.location.ilike(like)))
+    return conds
+
+
+def list_runs(
+    session: Session,
+    limit: int = 20,
+    *,
+    started_from: datetime | None = None,
+    started_to: datetime | None = None,
+    text: str | None = None,
+) -> list[SearchRun]:
+    """Sichtbare Läufe, neueste zuerst; optional nach Zeitraum (``[from, to)``) und Text."""
     stmt = (
         select(SearchRun)
-        .where(SearchRun.hidden_at.is_(None))
-        .order_by(SearchRun.id.desc())
+        .where(SearchRun.hidden_at.is_(None), *_run_filters(started_from, started_to, text))
+        .order_by(SearchRun.started_at.desc(), SearchRun.id.desc())
         .limit(limit)
     )
     return list(session.scalars(stmt))
@@ -200,11 +223,28 @@ def hide_run(session: Session, run_id: int) -> None:
     session.flush()
 
 
-def hide_all_runs(session: Session) -> int:
+def hide_runs(
+    session: Session,
+    *,
+    ids: list[int] | None = None,
+    started_from: datetime | None = None,
+    started_to: datetime | None = None,
+) -> int:
+    """Läufe ausblenden (nicht löschen, die Historie bleibt für spätere Auswertung).
+
+    Ohne Filter wird der gesamte Verlauf ausgeblendet, sonst nur ``ids`` und/oder der Zeitraum.
+    """
+    conds = _run_filters(started_from, started_to, None)
+    if ids is not None:
+        conds.append(SearchRun.id.in_(ids))
     result = session.execute(
-        update(SearchRun).where(SearchRun.hidden_at.is_(None)).values(hidden_at=utcnow())
+        update(SearchRun).where(SearchRun.hidden_at.is_(None), *conds).values(hidden_at=utcnow())
     )
     return int(getattr(result, "rowcount", 0) or 0)
+
+
+def hide_all_runs(session: Session) -> int:
+    return hide_runs(session)
 
 
 def get_listing(session: Session, listing_id: int) -> Listing:

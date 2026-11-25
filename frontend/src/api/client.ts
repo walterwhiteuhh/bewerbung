@@ -63,6 +63,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 const json = (method: string, data: unknown): RequestInit => ({ method, body: JSON.stringify(data) });
 
+/** Query-String aus einem Objekt; leere Werte entfallen, Arrays werden wiederholt (?ids=1&ids=2). */
+function query(p: Record<string, string | number | number[] | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) {
+    if (v === undefined || v === "") continue;
+    for (const x of Array.isArray(v) ? v : [v]) sp.append(k, String(x));
+  }
+  const str = sp.toString();
+  return str ? `?${str}` : "";
+}
+
 export const api = {
   listPostings(f: PostingFilter, limit = 200): Promise<PostingPage> {
     const params = new URLSearchParams({ sort: f.sort, order: f.order, limit: String(limit) });
@@ -104,7 +115,8 @@ export const api = {
   tags: () => request<TagCount[]>("/tags"),
   providers: () => request<ProviderInfo[]>("/search/providers"),
   search: (p: SearchParams) => request<SearchRun>("/search", json("POST", p)),
-  searchRuns: () => request<SearchRunSummary[]>("/search/runs?limit=8"),
+  searchRuns: (p: { from?: string; to?: string; q?: string; limit?: number } = {}) =>
+    request<SearchRunSummary[]>(`/search/runs${query({ limit: 50, ...p })}`),
   searchRun: (id: number) => request<SearchRun>(`/search/runs/${id}`),
   profiles: () => request<SearchProfile[]>("/search/profiles"),
   createProfile: (p: Omit<SearchProfile, "id" | "created_at">) =>
@@ -115,7 +127,8 @@ export const api = {
     const resp = await fetch(`/api/search/runs/${id}`, { method: "DELETE" });
     if (!resp.ok) throw new ApiError(resp.status, "Löschen fehlgeschlagen");
   },
-  clearRuns: () => request<{ hidden: number }>("/search/runs", { method: "DELETE" }),
+  clearRuns: (p: { ids?: number[]; from?: string; to?: string } = {}) =>
+    request<{ hidden: number }>(`/search/runs${query(p)}`, { method: "DELETE" }),
   deleteProfile: async (id: number) => {
     const resp = await fetch(`/api/search/profiles/${id}`, { method: "DELETE" });
     if (!resp.ok) throw new ApiError(resp.status, "Löschen fehlgeschlagen");

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -302,15 +303,34 @@ async def run_search(
 
 @router.get("/search/runs", response_model=list[SearchRunSummary], tags=["search"])
 def list_runs(
-    session: SessionDep, limit: Annotated[int, Query(ge=1, le=100)] = 20
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 20,
+    started_from: Annotated[datetime | None, Query(alias="from")] = None,
+    started_to: Annotated[datetime | None, Query(alias="to")] = None,
+    q: Annotated[str | None, Query(max_length=100)] = None,
 ) -> list[SearchRunSummary]:
-    return [SearchRunSummary.model_validate(r) for r in search.list_runs(session, limit)]
+    """Verlauf; ``from`` (inklusive) und ``to`` (exklusiv) grenzen den Zeitraum ein."""
+    runs = search.list_runs(
+        session, limit, started_from=started_from, started_to=started_to, text=q
+    )
+    return [SearchRunSummary.model_validate(r) for r in runs]
 
 
 @router.delete("/search/runs", tags=["search"])
-def clear_runs(session: SessionDep) -> dict[str, int]:
-    """Verlauf leeren: Läufe werden ausgeblendet, nicht gelöscht (Auswertung bleibt möglich)."""
-    return {"hidden": search.hide_all_runs(session)}
+def clear_runs(
+    session: SessionDep,
+    ids: Annotated[list[int] | None, Query()] = None,
+    started_from: Annotated[datetime | None, Query(alias="from")] = None,
+    started_to: Annotated[datetime | None, Query(alias="to")] = None,
+) -> dict[str, int]:
+    """Verlauf leeren, komplett oder nur Teile (``ids`` und/oder Zeitraum).
+
+    Läufe werden ausgeblendet, nicht gelöscht (Auswertung bleibt möglich)."""
+    return {
+        "hidden": search.hide_runs(
+            session, ids=ids, started_from=started_from, started_to=started_to
+        )
+    }
 
 
 @router.delete("/search/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["search"])
