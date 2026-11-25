@@ -1221,7 +1221,8 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 }
 .doc-picks { display: flex; flex-wrap: wrap; gap: 6px; }
 .doc-picks .chip { max-width: 100%; }
-.profile-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.profile-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.history .badge-primary { margin-left: 8px; vertical-align: middle; }
 @media (prefers-color-scheme: dark) {
   .doc__icon--pdf { background: #4a1f1b; color: #ffb4a9; }
   .doc__icon--docx { background: #1d2850; color: #b3c5ff; }

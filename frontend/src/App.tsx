@@ -12,6 +12,7 @@ import { PostingForm } from "./components/PostingForm";
 import { PostingList } from "./components/PostingList";
 import { DocumentsPanel } from "./components/Documents";
 import { ProfileForm } from "./components/ProfileForm";
+import { ProfileHistory } from "./components/ProfileHistory";
 import { SearchView } from "./components/SearchView";
 import { StatsBar } from "./components/StatsBar";
 import { TagFilterBar } from "./components/TagInput";
@@ -28,7 +29,7 @@ const SORTS: { value: `${SortField}:${"asc" | "desc"}`; label: string }[] = [
   { value: "title:asc", label: "Titel A–Z" },
 ];
 
-type ProfileTab = "angaben" | "unterlagen";
+type ProfileTab = "angaben" | "unterlagen" | "verlauf";
 type FormState = { mode: "create" } | { mode: "edit"; posting: Posting } | null;
 
 /** Startseite ohne Datenabfragen; die App-Ansichten laden erst, wenn sie gebraucht werden. */
@@ -108,8 +109,17 @@ function Workspace() {
         <button type="button" className={profileTab === "unterlagen" ? "is-active" : ""} onClick={() => setProfileTab("unterlagen")}>
           Unterlagen
         </button>
+        <button type="button" className={profileTab === "verlauf" ? "is-active" : ""} onClick={() => setProfileTab("verlauf")}>
+          Verlauf
+        </button>
       </nav>
-      {profileTab === "unterlagen" ? <DocumentsPanel /> : <ProfileForm onDone={() => setProfileTab(null)} />}
+      {profileTab === "unterlagen" ? (
+        <DocumentsPanel />
+      ) : profileTab === "verlauf" ? (
+        <ProfileHistory />
+      ) : (
+        <ProfileForm onDone={() => setProfileTab(null)} />
+      )}
     </Dialog>
   );
 

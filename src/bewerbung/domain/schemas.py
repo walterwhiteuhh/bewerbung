@@ -539,6 +539,29 @@ class ProfileRead(_Schema):
     updated_at: datetime | None = None
 
 
+class ProfileVersionRead(_Schema):
+    """Ein Profilstand (append-only) mit den Änderungen gegenüber dem Vorgänger."""
+
+    id: int
+    created_at: datetime
+    is_first: bool
+    changed_fields: list[str]
+    skills_added: list[str]
+    skills_removed: list[str]
+    application_count: int = Field(description="Bewerbungen, die mit diesem Stand rausgingen")
+
+
+class PrimaryCvPeriodRead(_Schema):
+    """Zeitraum, in dem eine Unterlage Haupt-Lebenslauf war."""
+
+    document_id: int
+    title: str
+    archived: bool
+    started_at: datetime
+    ended_at: datetime | None
+    application_count: int = Field(description="Bewerbungen, die in diesem Zeitraum rausgingen")
+
+
 class ProfileUpdate(_Schema):
     full_name: OptStr = Field(default=None, max_length=255)
     email: OptStr = Field(default=None, max_length=255)

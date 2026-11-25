@@ -16,6 +16,7 @@ from bewerbung.domain.schemas import (
     DocumentText,
     DocumentUpdate,
     PostingDocumentsUpdate,
+    PrimaryCvPeriodRead,
     ProfileRead,
 )
 from bewerbung.services import documents, letters
@@ -67,6 +68,14 @@ async def upload_document(
         title=title or None,
     )
     return documents.to_read(doc)
+
+
+@router.get(
+    "/documents/primary-history", response_model=list[PrimaryCvPeriodRead], tags=["documents"]
+)
+def primary_cv_history(session: SessionDep) -> list[PrimaryCvPeriodRead]:
+    """Wann welche Unterlage Haupt-Lebenslauf war und wie viele Bewerbungen darin rausgingen."""
+    return documents.primary_history(session)
 
 
 @router.get("/documents/{document_id}/file", tags=["documents"])

@@ -304,3 +304,53 @@ def test_period_columns_are_unified_and_roundtrip(tmp_path: Path) -> None:
         assert {"added_at", "removed_at"} <= cols
     command.upgrade(cfg, "head")
     engine.dispose()
+
+
+# --- Verlauf über die API -------------------------------------------------------------------
+
+
+def test_profile_history_endpoint(client: TestClient, make_posting) -> None:
+    client.put("/api/profile", json={"full_name": "Max", "skills": ["Python"]})
+    first = make_posting()["application"]["id"]
+    _status(client, first, "applied")  # geht mit Stand 1 raus
+    client.put(
+        "/api/profile", json={"full_name": "Max", "skills": ["Python", "SQL"], "headline": "DS"}
+    )
+    client.put(
+        "/api/profile", json={"full_name": "Max", "skills": ["Python", "SQL"], "headline": "DS"}
+    )
+
+    hist = client.get("/api/profile/history").json()
+    assert [h["is_first"] for h in hist] == [
+        False,
+        True,
+    ]  # neueste zuerst, unverändert = keine Version
+    newest, oldest = hist
+    assert newest["changed_fields"] == ["headline", "skills"]
+    assert newest["skills_added"] == ["SQL"] and newest["skills_removed"] == []
+    assert newest["application_count"] == 0
+    assert oldest["application_count"] == 1
+    assert oldest["changed_fields"] == ["full_name", "skills"]
+
+
+def test_profile_history_ignores_derived_coordinates(
+    client: TestClient, settings: Settings
+) -> None:
+    client.put("/api/profile", json={"full_name": "Max", "home_location": "Hamburg"})
+    with closing(_db(settings)) as con, con:  # Koordinaten werden nachträglich aufgelöst
+        con.execute("UPDATE applicant_profiles SET home_lat = 53.5, home_lon = 10.0")
+    client.put("/api/profile", json={"full_name": "Max", "home_location": "Hamburg"})
+    assert len(client.get("/api/profile/history").json()) == 1
+
+
+def test_primary_cv_history_endpoint(client: TestClient, make_posting) -> None:
+    a = upload(client, "a.pdf", make_pdf("Erster"), kind="lebenslauf").json()
+    app_id = make_posting()["application"]["id"]
+    _status(client, app_id, "applied")  # geht mit Lebenslauf A raus
+    b = upload(client, "b.pdf", make_pdf("Zweiter"), kind="lebenslauf").json()
+    client.patch(f"/api/documents/{b['id']}", json={"is_primary": True})
+
+    periods = client.get("/api/documents/primary-history").json()
+    assert [p["document_id"] for p in periods] == [b["id"], a["id"]]  # neueste zuerst
+    assert periods[0]["ended_at"] is None and periods[0]["application_count"] == 0
+    assert periods[1]["ended_at"] is not None and periods[1]["application_count"] == 1

@@ -9,10 +9,10 @@ import re
 import tempfile
 from pathlib import Path
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import Document, DocumentPrimaryPeriod, PostingDocument
+from bewerbung.db.models import Application, Document, DocumentPrimaryPeriod, PostingDocument
 from bewerbung.db.types import utcnow
 from bewerbung.documents.extract import (
     EXTRACTOR_VERSION,
@@ -21,7 +21,12 @@ from bewerbung.documents.extract import (
     extract_text,
 )
 from bewerbung.domain.errors import DomainError, DuplicateDocumentError, NotFoundError
-from bewerbung.domain.schemas import DocumentKind, DocumentRead, DocumentUpdate
+from bewerbung.domain.schemas import (
+    DocumentKind,
+    DocumentRead,
+    DocumentUpdate,
+    PrimaryCvPeriodRead,
+)
 from bewerbung.services.letters import get_profile
 from bewerbung.services.postings import get_posting
 
@@ -186,6 +191,39 @@ def sync_primary_periods(session: Session) -> None:
     for doc_id in current - open_periods.keys():
         session.add(DocumentPrimaryPeriod(document_id=doc_id, started_at=now))
     session.flush()
+
+
+def primary_history(session: Session) -> list[PrimaryCvPeriodRead]:
+    """Zeiträume des Haupt-Lebenslaufs (neueste zuerst) mit der Zahl der darin versendeten
+    Bewerbungen (``applied_at`` im Zeitraum)."""
+    sent = (
+        select(func.count())
+        .select_from(Application)
+        .where(
+            Application.applied_at.is_not(None),
+            Application.applied_at >= DocumentPrimaryPeriod.started_at,
+            (DocumentPrimaryPeriod.ended_at.is_(None))
+            | (Application.applied_at < DocumentPrimaryPeriod.ended_at),
+        )
+        .correlate(DocumentPrimaryPeriod)
+        .scalar_subquery()
+    )
+    rows = session.execute(
+        select(DocumentPrimaryPeriod, Document.title, Document.archived_at, sent)
+        .join(Document, Document.id == DocumentPrimaryPeriod.document_id)
+        .order_by(DocumentPrimaryPeriod.started_at.desc(), DocumentPrimaryPeriod.id.desc())
+    ).all()
+    return [
+        PrimaryCvPeriodRead(
+            document_id=p.document_id,
+            title=title,
+            archived=archived is not None,
+            started_at=p.started_at,
+            ended_at=p.ended_at,
+            application_count=count or 0,
+        )
+        for p, title, archived, count in rows
+    ]
 
 
 def _clear_primary(session: Session, keep_id: int) -> None:

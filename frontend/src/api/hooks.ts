@@ -27,6 +27,8 @@ export const useStats = () => useQuery({ queryKey: keys.stats, queryFn: api.stat
 export const useTags = () => useQuery({ queryKey: keys.tags, queryFn: api.tags, staleTime: 30_000 });
 
 export const useProfile = () => useQuery({ queryKey: keys.profile, queryFn: api.profile });
+export const useProfileHistory = () => useQuery({ queryKey: ["profile-history"], queryFn: api.profileHistory });
+export const usePrimaryCvHistory = () => useQuery({ queryKey: ["primary-cv-history"], queryFn: api.primaryCvHistory });
 export const useGenerators = () => useQuery({ queryKey: keys.generators, queryFn: api.generators, staleTime: 60_000 });
 export const useLetters = (postingId: number) =>
   useQuery({ queryKey: keys.letters(postingId), queryFn: () => api.letters(postingId) });
@@ -53,6 +55,8 @@ export function useMutate<TArgs, TResult>(fn: (args: TArgs) => Promise<TResult>)
       void qc.invalidateQueries({ queryKey: ["letters"] });
       void qc.invalidateQueries({ queryKey: ["letter-context"] });
       void qc.invalidateQueries({ queryKey: keys.profile });
+      void qc.invalidateQueries({ queryKey: ["profile-history"] });
+      void qc.invalidateQueries({ queryKey: ["primary-cv-history"] });
       void qc.invalidateQueries({ queryKey: keys.documents });
       void qc.invalidateQueries({ queryKey: ["posting-documents"] });
       void qc.invalidateQueries({ queryKey: ["posting-insights"] });

@@ -530,3 +530,22 @@ export interface DocumentInfo {
   created_at: string;
   archived_at: string | null;
 }
+
+export interface ProfileVersion {
+  id: number;
+  created_at: string;
+  is_first: boolean;
+  changed_fields: string[];
+  skills_added: string[];
+  skills_removed: string[];
+  application_count: number;
+}
+
+export interface PrimaryCvPeriod {
+  document_id: number;
+  title: string;
+  archived: boolean;
+  started_at: string;
+  ended_at: string | null;
+  application_count: number;
+}

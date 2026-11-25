@@ -350,3 +350,21 @@ test.describe("Statuswechsel mit Grund und Gehalt", () => {
     }
   });
 });
+
+test.describe("Profilverlauf", () => {
+  test("Tab Verlauf zeigt Profilstände mit Skill-Änderungen und passt in den Viewport", async ({ page, request }) => {
+    const base = { full_name: "Verlauf Tester", email: null, phone: null, address: null, headline: null, summary: null, cv_text: null, signature: null, home_location: null, max_distance_km: null };
+    await request.put("/api/profile", { data: { ...base, skills: ["Python"] } });
+    await request.put("/api/profile", { data: { ...base, skills: ["Python", "SQL"], headline: "Data Scientist" } });
+
+    await page.goto("/#/");
+    await page.getByRole("button", { name: "Mein Profil" }).first().click();
+    await page.getByRole("button", { name: "Verlauf" }).click();
+    const history = page.locator(".history");
+    await expect(history.getByText("Kurzprofil, Skills geändert")).toBeVisible();
+    await expect(history.locator(".timeline__detail", { hasText: /^\+SQL$/ })).toBeVisible();
+    await expect(history.getByText("Erste Fassung")).toBeVisible();
+    await expect(history.locator(".badge-primary", { hasText: "aktuell" }).first()).toBeVisible();
+    expect(await layoutIssues(page)).toEqual([]);
+  });
+});

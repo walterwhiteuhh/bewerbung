@@ -12,10 +12,11 @@ import hashlib
 import json
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from bewerbung.db.models import ApplicantProfile, ApplicantProfileVersion
+from bewerbung.db.models import ApplicantProfile, ApplicantProfileVersion, Application
+from bewerbung.domain.schemas import ProfileVersionRead
 
 TRACKED_FIELDS = (
     "full_name",
@@ -27,8 +28,6 @@ TRACKED_FIELDS = (
     "skills",
     "cv_text",
     "home_location",
-    "home_lat",
-    "home_lon",
     "max_distance_km",
     "signature",
 )
@@ -59,12 +58,56 @@ def record_version(session: Session, profile: ApplicantProfile) -> ApplicantProf
     snap = snapshot_of(profile)
     digest = _hash(snap)
     last = latest_version(session, profile.id)
-    if last is not None and last.content_hash == digest:
+    # Vergleich über die verfolgten Felder (nicht über den gespeicherten Hash): ältere
+    # Schnappschüsse enthalten evtl. abgeleitete Felder wie Koordinaten, die nichts bedeuten.
+    if last is not None and {f: last.snapshot.get(f) for f in TRACKED_FIELDS} == snap:
         return None
     version = ApplicantProfileVersion(profile_id=profile.id, content_hash=digest, snapshot=snap)
     session.add(version)
     session.flush()
     return version
+
+
+def list_history(session: Session) -> list[ProfileVersionRead]:
+    """Profilstände, neueste zuerst: was sich gegenüber dem Vorgänger geändert hat und mit
+    wie vielen Bewerbungen der Stand rausging (``applications.profile_version_id``)."""
+    versions = list(
+        session.scalars(
+            select(ApplicantProfileVersion).order_by(
+                ApplicantProfileVersion.profile_id, ApplicantProfileVersion.id
+            )
+        )
+    )
+    counts = dict(
+        session.execute(
+            select(Application.profile_version_id, func.count())
+            .where(Application.profile_version_id.is_not(None))
+            .group_by(Application.profile_version_id)
+        ).all()
+    )
+    out: list[ProfileVersionRead] = []
+    previous: dict[str, Any] = {}
+    previous_profile: int | None = None
+    for v in versions:
+        before = previous if previous_profile == v.profile_id else {}
+        now = {f: v.snapshot.get(f) for f in TRACKED_FIELDS}
+        changed = [
+            f for f in TRACKED_FIELDS if now[f] != before.get(f) and (now[f] or before.get(f))
+        ]
+        old_skills, new_skills = set(before.get("skills") or []), set(now["skills"] or [])
+        out.append(
+            ProfileVersionRead(
+                id=v.id,
+                created_at=v.created_at,
+                is_first=not before,
+                changed_fields=changed,
+                skills_added=sorted(new_skills - old_skills, key=str.casefold),
+                skills_removed=sorted(old_skills - new_skills, key=str.casefold),
+                application_count=counts.get(v.id, 0),
+            )
+        )
+        previous, previous_profile = now, v.profile_id
+    return out[::-1]
 
 
 def current_version_id(session: Session) -> int | None:

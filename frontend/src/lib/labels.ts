@@ -76,3 +76,17 @@ export const OUTCOME_REASON_LABEL: Record<OutcomeReason, string> = {
   own_decision: "Eigene Entscheidung",
   other: "Sonstiges",
 };
+
+export const PROFILE_FIELD_LABEL: Record<string, string> = {
+  full_name: "Name",
+  email: "E-Mail",
+  phone: "Telefon",
+  address: "Adresse",
+  headline: "Kurzprofil",
+  summary: "Über mich",
+  skills: "Skills",
+  cv_text: "Lebenslauf (Text)",
+  home_location: "Wohnort",
+  max_distance_km: "Entfernung",
+  signature: "Signatur",
+};

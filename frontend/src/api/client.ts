@@ -29,6 +29,8 @@ import type {
   DocumentInfo,
   DocumentKind,
   StatusOutcome,
+  ProfileVersion,
+  PrimaryCvPeriod,
 } from "./types";
 
 export class ApiError extends Error {
@@ -150,6 +152,8 @@ export const api = {
   saveListing: (id: number, priority = 3) =>
     request<PostingDetail>(`/listings/${id}/save`, json("POST", { priority })),
   profile: () => request<Profile>("/profile"),
+  profileHistory: () => request<ProfileVersion[]>("/profile/history"),
+  primaryCvHistory: () => request<PrimaryCvPeriod[]>("/documents/primary-history"),
   saveProfile: (p: Omit<Profile, "updated_at" | "home_located">) => request<Profile>("/profile", json("PUT", p)),
   generators: () => request<GeneratorInfo[]>("/letters/generators"),
   letterContext: (postingId: number) => request<LetterContext>(`/postings/${postingId}/letter-context`),

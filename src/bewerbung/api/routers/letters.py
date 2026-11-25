@@ -13,8 +13,9 @@ from bewerbung.domain.schemas import (
     LetterContextPreview,
     ProfileRead,
     ProfileUpdate,
+    ProfileVersionRead,
 )
-from bewerbung.services import insights, letters
+from bewerbung.services import insights, letters, profile_history
 
 router = APIRouter()
 
@@ -22,6 +23,12 @@ router = APIRouter()
 @router.get("/profile", response_model=ProfileRead, tags=["letters"])
 def get_profile(session: SessionDep) -> ProfileRead:
     return ProfileRead.model_validate(letters.get_profile(session))
+
+
+@router.get("/profile/history", response_model=list[ProfileVersionRead], tags=["letters"])
+def profile_history_list(session: SessionDep) -> list[ProfileVersionRead]:
+    """Verlauf der Profilstände mit Änderungen und Zahl der damit versendeten Bewerbungen."""
+    return profile_history.list_history(session)
 
 
 @router.put("/profile", response_model=ProfileRead, tags=["letters"])
