@@ -223,6 +223,8 @@ export interface Stats {
   by_status: CountBucket[];
   by_source: CountBucket[];
   response_rate: number | null;
+  activity_7d: number;
+  last_activity_at: string | null;
 }
 
 export interface PostingFilter {

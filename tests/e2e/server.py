@@ -106,7 +106,17 @@ def seed(client: TestClient) -> None:
     run = client.post("/api/search", json={"query": "data"}).json()
     ids = {h["listing"]["external_id"]: h["listing"]["id"] for h in run["hits"]}
     first = client.post(f"/api/listings/{ids['a1']}/save", json={}).json()
-    client.post(f"/api/listings/{ids['a2']}/save", json={}).raise_for_status()
+    second = client.post(f"/api/listings/{ids['a2']}/save", json={}).json()
+    # Etwas Bewegung für die Kennzahlen-Szene: ein Gespräch, ein Angebot.
+    for app, steps in (
+        (first, ("applied", "interview")),
+        (second, ("applied", "in_review", "offer")),
+    ):
+        for step in steps:
+            app_id = app["application"]["id"]
+            client.post(
+                f"/api/applications/{app_id}/status", json={"status": step}
+            ).raise_for_status()
     client.put("/api/profile", json=profile).raise_for_status()  # Wohnort jetzt verortbar
     cid = first["company"]["id"]
     for source, value, count in (("kununu", 3.9, 214), ("glassdoor", 4.3, 37), ("indeed", 3.0, 6)):

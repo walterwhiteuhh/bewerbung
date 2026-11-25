@@ -76,3 +76,6 @@ def test_stats(client: TestClient, make_posting) -> None:
     assert counts["rejected"] == 1 and counts["applied"] == 1 and counts["saved"] == 1
     assert {s["key"]: s["count"] for s in stats["by_source"]} == {"manual": 2, "linkedin": 1}
     assert stats["response_rate"] == 0.5
+    # 3 x "gemerkt" beim Anlegen + 3 Wechsel, alle innerhalb der letzten 7 Tage
+    assert stats["activity_7d"] == 6
+    assert stats["last_activity_at"] is not None

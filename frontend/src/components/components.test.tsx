@@ -101,6 +101,20 @@ describe("Bausteine", () => {
     expect(container.querySelector(".ship")).toHaveAttribute("data-phase", "night");
   });
 
+  it("zeichnet Kennzahlen als Seegang, Wimpel, Bojen und Leuchtfeuer", () => {
+    const voyage = { wind: 3, windLabel: "steife Brise", activity: 12, active: 4, pennants: 4,
+      interviews: 2, buoys: 2, offers: 1, accepted: 0 } as const;  // prettier-ignore
+    const { container } = render(<ShipScene phase="day" voyage={voyage} />);
+    const svg = container.querySelector(".ship")!;
+    expect(svg).toHaveAttribute("data-wind", "3");
+    expect(svg).toHaveAttribute("data-offer");
+    expect(container.querySelectorAll(".ship__pennants path:not(.ship__line)")).toHaveLength(4);
+    expect(container.querySelectorAll(".ship__buoy")).toHaveLength(2);
+    expect(container.querySelector(".ship__island")).toBeNull();
+    expect(screen.getByText("Leuchtfeuer: 1 Angebot")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /4 Wimpel = laufende Bewerbungen/ })).toBeInTheDocument();
+  });
+
   it("ruft beim Antippen reihum Seemannssprüche", async () => {
     const user = userEvent.setup();
     render(<ShipScene phase="day" />);

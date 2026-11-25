@@ -6,8 +6,14 @@
  *   funkelnden Sternen, Leuchtturm und Laterne an Bord.
  * - Ab und zu taucht ein Wal auf und bläst.
  * - Antippen ruft „Ahoi!“: Das Schiff springt über die Welle, dazu ein Seemannsspruch.
+ *
+ * Mit `voyage` zeigt die Szene Kennzahlen (siehe lib/voyage.ts): Seegang = Aktivität der
+ * letzten 7 Tage, Wimpel = laufende Bewerbungen, Bojen = Gespräche, Leuchtfeuer = Angebot,
+ * Insel = Zusage. Ein Logbuch darunter erklärt die Symbole.
  */
 import { useEffect, useState } from "react";
+
+import { logbook, type Voyage } from "../lib/voyage";
 
 // Eine Wellenperiode = 60 Einheiten; die Fläche ist doppelt so breit wie die Szene,
 // damit eine Verschiebung um 240 nahtlos wiederholt werden kann.
@@ -59,24 +65,44 @@ function usePhase(fixed?: Phase): Phase {
   return phase;
 }
 
-export function ShipScene({ size = "md", phase: fixed }: { size?: "sm" | "md"; phase?: Phase }) {
+// Wimpelleine vom Masttopp zum Heck; Wimpel hängen gleichmäßig verteilt daran.
+const LINE: [number, number, number, number] = [120, 28, 52, 104];
+const PENNANT_COLORS = ["var(--marker)", "var(--accent)", "var(--s-offer)", "var(--s-rejected)"];
+const BUOY_X = [34, 60, 184, 206, 226];
+
+function pennants(n: number) {
+  const [x1, y1, x2, y2] = LINE;
+  return Array.from({ length: n }, (_, i) => {
+    const t = (i + 1) / (n + 1);
+    const x = x1 + (x2 - x1) * t;
+    const y = y1 + (y2 - y1) * t;
+    return { x, y, color: PENNANT_COLORS[i % PENNANT_COLORS.length] };
+  });
+}
+
+interface Props {
+  size?: "sm" | "md";
+  phase?: Phase;
+  voyage?: Voyage;
+}
+
+export function ShipScene({ size = "md", phase: fixed, voyage }: Props) {
   const phase = usePhase(fixed);
   const [ahoy, setAhoy] = useState(0); // Zähler: jede Berührung startet die Animation neu
   const saying = ahoy > 0 ? SAYINGS[(ahoy - 1) % SAYINGS.length] : null;
+  const log = voyage ? logbook(voyage) : [];
+  const label = ["Segelschiff auf bewegter See", ...log.map((e) => e.label), "Antippen für Ahoi!"].join(". ");
 
-  return (
-    <button
-      type="button"
-      className={`ship-btn ship-btn--${size}`}
-      onClick={() => setAhoy((n) => n + 1)}
-      aria-label="Segelschiff auf bewegter See. Antippen für Ahoi!"
-    >
+  const scene = (
+    <button type="button" className={`ship-btn ship-btn--${size}`} onClick={() => setAhoy((n) => n + 1)} aria-label={label}>
       <span className="sr-only" aria-live="polite">
         {saying}
       </span>
       <svg
         className="ship"
         data-phase={phase}
+        data-wind={voyage?.wind}
+        data-offer={voyage && voyage.offers > 0 ? "" : undefined}
         viewBox="0 0 240 160"
         aria-hidden="true"
       >
@@ -101,7 +127,16 @@ export function ShipScene({ size = "md", phase: fixed }: { size?: "sm" | "md"; p
           <path className="ship__beam" d="M26 84L118 66V102Z" />
           <circle className="ship__lamp" cx="26" cy="84" r="2.2" />
         </g>
-        <path className="ship__wave ship__wave--back" d={BACK} />
+        {voyage && voyage.accepted > 0 && (
+          <g className="ship__island">
+            <path d="M190 113q20-16 46 0Z" />
+            <path className="ship__palm" d="M214 106q-1-10 3-17" />
+            <path className="ship__frond" d="M217 89q-8-3-13 3M217 89q7-5 13 1M217 89q-3-6-9-7M217 89q4-6 10-5" />
+          </g>
+        )}
+        <g className="ship__swell">
+          <path className="ship__wave ship__wave--back" d={BACK} />
+        </g>
         <g className="ship__whale">
           <path d="M178 126Q186 108 202 107Q216 107 226 122L230 126Z" />
           <path d="M207 108l5-8 1 9Z" />
@@ -109,19 +144,40 @@ export function ShipScene({ size = "md", phase: fixed }: { size?: "sm" | "md"; p
         </g>
         <g className="ship__boat">
           <g className={ahoy ? "ship__hop is-hopping" : "ship__hop"} key={ahoy}>
-          <g className="ship__rock">
-            <path className="ship__mast" d="M120 26V110" />
-            <path className="ship__sail" d="M125 32Q160 64 164 102H125Z" />
-            <path className="ship__sail ship__sail--front" d="M115 40Q90 70 82 102H115Z" />
-            <path className="ship__flag" d="M120 26l14 5-14 5z" />
-            <path className="ship__hull" d="M72 108H170L157 128H86Z" />
-            <path className="ship__stripe" d="M80 115H164" />
-            <circle className="ship__lantern" cx="164" cy="104" r="2.6" />
-          </g>
+            <g className="ship__rock">
+              <path className="ship__mast" d="M120 26V110" />
+              <path className="ship__sail" d="M125 32Q160 64 164 102H125Z" />
+              <path className="ship__sail ship__sail--front" d="M115 40Q90 70 82 102H115Z" />
+              <path className="ship__flag" d="M120 26l14 5-14 5z" />
+              {voyage && voyage.pennants > 0 && (
+                <g className="ship__pennants">
+                  <path className="ship__line" d={`M${LINE[0]} ${LINE[1]}L${LINE[2]} ${LINE[3]}`} />
+                  {pennants(voyage.pennants).map((p, i) => (
+                    <path key={i} d={`M${p.x - 4.5} ${p.y}h9l-4.5 10z`} fill={p.color} />
+                  ))}
+                </g>
+              )}
+              {voyage && voyage.pennants > 0 && <path className="ship__sprit" d="M76 109L52 104" />}
+              <path className="ship__hull" d="M72 108H170L157 128H86Z" />
+              <path className="ship__stripe" d="M80 115H164" />
+              <circle className="ship__lantern" cx="164" cy="104" r="2.6" />
+            </g>
           </g>
         </g>
-        <path className="ship__wave ship__wave--mid" d={MID} />
-        <path className="ship__wave ship__wave--front" d={FRONT} />
+        <g className="ship__swell">
+          <path className="ship__wave ship__wave--mid" d={MID} />
+        </g>
+        {voyage &&
+          BUOY_X.slice(0, voyage.buoys).map((x, i) => (
+            <g key={x} className="ship__buoy" style={{ animationDelay: `${-i * 0.7}s` }}>
+              <path d={`M${x - 6} 130h12l-2.4-15h-7.2Z`} />
+              <path className="ship__buoy-band" d={`M${x - 5} 124h10`} />
+              <circle className="ship__buoy-light" cx={x} cy={112} r={2.2} />
+            </g>
+          ))}
+        <g className="ship__swell">
+          <path className="ship__wave ship__wave--front" d={FRONT} />
+        </g>
         {saying && (
           <g className="ship__bubble" key={`b${ahoy}`}>
             <rect x="8" y="8" width="112" height="22" rx="11" />
@@ -132,5 +188,19 @@ export function ShipScene({ size = "md", phase: fixed }: { size?: "sm" | "md"; p
         )}
       </svg>
     </button>
+  );
+
+  if (!voyage) return scene;
+  return (
+    <figure className={`voyage voyage--${size}`}>
+      {scene}
+      <figcaption className="voyage__log" aria-hidden="true">
+        {log.map((e) => (
+          <span key={e.key} className={`voyage__entry voyage__entry--${e.key}`}>
+            {e.label}
+          </span>
+        ))}
+      </figcaption>
+    </figure>
   );
 }
