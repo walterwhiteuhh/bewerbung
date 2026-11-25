@@ -23,6 +23,7 @@ from bewerbung.api.deps import (
     SiteLogosDep,
 )
 from bewerbung.domain.errors import DomainError
+from bewerbung.domain.keywords import suggest_tags
 from bewerbung.domain.schemas import (
     ApplicationRead,
     ApplicationUpdate,
@@ -347,9 +348,23 @@ def get_run(session: SessionDep, run_id: int) -> SearchRunRead:
 def _run_with_features(session: SessionDep, run: Any) -> SearchRunRead:
     read = SearchRunRead.model_validate(run)
     feats = insights.listing_features(session, [h.listing for h in run.hits])
-    for hit in read.hits:
+    for hit, src in zip(read.hits, run.hits, strict=True):
         hit.features = feats.get(hit.listing.id)
+        hit.tags = _hit_tags(src.listing)
     return read
+
+
+def _hit_tags(listing: Any) -> list[str]:
+    """Gemerkt: die echten Hashtags der Stelle. Sonst Vorschläge aus Titel und Beschreibung."""
+    if listing.posting is not None and listing.posting.tags:
+        return list(listing.posting.tags)
+    return suggest_tags(
+        title=listing.title,
+        description=listing.description,
+        location=listing.location,
+        remote_type=listing.remote_type,
+        employment_type=listing.employment_type,
+    )
 
 
 @router.get("/search/profiles", response_model=list[SearchProfileRead], tags=["search"])

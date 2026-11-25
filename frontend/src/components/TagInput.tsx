@@ -78,16 +78,23 @@ export function TagInput({ value, onChange, placeholder = "#hashtag hinzufügen"
   );
 }
 
-/** Hashtags nur anzeigen (Karten, Treffer). */
-export function TagList({ tags, active = [] }: { tags: string[]; active?: string[] }) {
+/** Hashtags anzeigen (Karten, Treffer); mit `onToggle` sind sie klickbar und filtern. */
+export function TagList({ tags, active = [], onToggle }: { tags: string[]; active?: string[]; onToggle?: (tag: string) => void }) {
   if (tags.length === 0) return null;
   return (
     <p className="hashtags">
-      {tags.map((t) => (
-        <span key={t} className={`hashtag ${active.some((a) => sameTag(a, t)) ? "is-active" : ""}`}>
-          #{t}
-        </span>
-      ))}
+      {tags.map((t) => {
+        const on = active.some((a) => sameTag(a, t));
+        return onToggle ? (
+          <button key={t} type="button" className={`hashtag hashtag--link ${on ? "is-active" : ""}`} aria-pressed={on} onClick={() => onToggle(t)}>
+            #{t}
+          </button>
+        ) : (
+          <span key={t} className={`hashtag ${on ? "is-active" : ""}`}>
+            #{t}
+          </span>
+        );
+      })}
     </p>
   );
 }
@@ -95,6 +102,20 @@ export function TagList({ tags, active = [] }: { tags: string[]; active?: string
 /** Leiste mit allen Hashtags; ein Klick filtert (mehrere = alle müssen passen). */
 export function TagFilterBar({ selected, onToggle }: { selected: string[]; onToggle: (tag: string) => void }) {
   const { data } = useTags();
+  return <TagBar tags={data} selected={selected} onToggle={onToggle} />;
+}
+
+/** Wie `TagFilterBar`, aber mit eigener Liste (z. B. die Hashtags der Suchtreffer). */
+export function TagBar({
+  tags,
+  selected,
+  onToggle,
+}: {
+  tags: { name: string; count: number }[] | undefined;
+  selected: string[];
+  onToggle: (tag: string) => void;
+}) {
+  const data = tags;
   if (!data || data.length === 0) return null;
   return (
     <div className="tag-bar" role="toolbar" aria-label="Nach Hashtag filtern">

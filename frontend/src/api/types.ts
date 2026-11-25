@@ -276,6 +276,7 @@ export interface SearchHit {
   is_new: boolean;
   listing: Listing;
   features: JobFeatures | null;
+  tags: string[];
 }
 
 export interface CompanyActivity {
